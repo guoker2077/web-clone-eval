@@ -2,11 +2,12 @@
 
 一条**全自动流水线**：给定目标网址与功能范围，自动抓取原页 → 调用 Claude 生成可运行的复刻工程 → 量化评估三维一致性 → 按评估反馈闭环精修，直到达标。
 
-对同类页面，**唯一的人工输入是一份 `scope.json`**（网址 + 功能点 + 视口 + 遮罩区域），无需改代码、无需人工干预 AI。
+对同类页面，**最小人工输入只有「网址 + 一句自然语言复刻范围」**——系统自动探测页面 DOM、合成结构化 `scope.json`，无需手写选择器或测试脚本，也无需改代码、人工干预 AI。（仍保留手写 `scope.json` 作为精确控制的备选。）
 
 ## 核心特性
 
-- **稳定复用**：新页面只写一份 scope，流水线自动完成复刻与评估。
+- **零脚本输入**：`synthesize_scope.py` 把「URL + 自然语言范围」自动展开成可驱动复刻与评估的结构化 scope，selector 取自真实 DOM，并经确定性校验。
+- **稳定复用**：新页面只给一句范围描述，流水线自动完成复刻与评估。
 - **闭环精修**：评估分数（视觉差异、失败的交互断言）回灌给 Claude 重新生成，分数驱动质量提升。
 - **可量化可置信**：采用 SSIM、CIEDE2000、pHash、IoU、断言通过率等业界公认指标，多视口测量，加权合成总分，权重透明可调。
 - **全自动评估**：复刻后无需人工驱动，构建→截图→打分→出报告一键完成。
@@ -14,8 +15,11 @@
 ## 流水线架构
 
 ```
-scope.json (唯一人工输入)
+网址 + 自然语言复刻范围  (最小人工输入)
    │
+   ▼
+⓪ Synthesize 轻量探测 DOM → Claude 合成 → 确定性校验 → scope.json
+   │                                    （也可跳过，直接手写 scope.json）
    ▼
 ① Capture    Playwright 抓原页 → 多视口整页截图 + DOM 快照 + 配色/字体 + 关键元素 bbox
    ▼
@@ -37,6 +41,7 @@ scope.json (唯一人工输入)
 web-clone-eval/
 ├─ pipeline/              # 流水线代码
 │  ├─ config.py           # Claude 客户端（兼容中转 token / 官方 key）
+│  ├─ synthesize_scope.py # ⓪ 合成 scope（URL+自然语言 → 结构化 scope.json）
 │  ├─ capture.py          # ① 抓取
 │  ├─ generate.py         # ② 生成
 │  ├─ evaluate.py         # ③ 评估（构建+截图+打分）
@@ -97,6 +102,7 @@ python run.py baidu --max-rounds 3 --threshold 85
 ## 命令
 
 ```bash
+python synthesize_scope.py <url> "<自然语言复刻范围>"  # ⓪ 合成 scope.json（可选 --id）
 python run.py <site>                  # 完整闭环：capture→generate→build→eval→refine
 python run.py <site> --skip-capture   # 复用已抓取的原页
 python run.py <site> --max-rounds 3   # 最大精修轮数
@@ -110,7 +116,29 @@ python report.py <site>               # 渲染报告
 
 ## 新增一个复刻页面
 
-只需在 `scopes/` 下新建 `<site>.json`，无需改任何代码：
+### 方式 A：自动合成 scope（推荐，最小输入）
+
+只给网址和一句自然语言范围，系统自动探测 DOM 并合成 `scopes/<id>.json`：
+
+```bash
+cd pipeline
+python synthesize_scope.py https://github.com/login \
+  "复刻用户名/密码输入框、Sign in 登录按钮、注册链接，验证登录交互与必填校验"
+# → 生成 scopes/github-login.json，随后即可 python run.py github-login
+```
+
+合成过程：① Playwright 轻量抓取目标页的真实交互元素清单（tag/id/name/选择器）；
+② Claude 把自然语言范围 + 真实元素清单展开成结构化 features；
+③ **确定性校验**——强制 `action` 落在白名单、behavior 的 `target` 必须引用已声明的 element、
+element 必须有真实 `selector_hint`，校验不过会回灌让模型自修。
+因此合成产物可直接驱动复刻与评估（实测 GitHub 登录页合成版闭环得分 94.3，与手写版持平）。
+
+> 站点 `id` 默认从 URL 推断（可用 `--id` 指定）。selector 取自**原页 DOM**，
+> 对结构复杂或重度动态渲染的页面合成质量会下降，此时建议改用方式 B 手写精确控制。
+
+### 方式 B：手写 scope（精确控制）
+
+直接在 `scopes/` 下新建 `<site>.json`，无需改任何代码：
 
 ```jsonc
 {
@@ -136,6 +164,7 @@ python report.py <site>               # 渲染报告
 字段说明：
 - `features[].type`: `element`（检查存在/可见）或 `behavior`（执行 steps 断言）
 - `steps[].action`: `fill` / `click` / `expect_visible` / `expect_text`
+- `steps[].target`: **必须是某个已声明 element feature 的 id**（不是 CSS 选择器）
 - 复刻页约定为可测试元素加 `data-testid="<feature-id>"`，评估据此定位
 - `masks`: 动态区域（广告/验证码）在视觉对比前遮罩，避免污染分数
 
