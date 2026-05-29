@@ -166,7 +166,7 @@ python report.py <site>               # 渲染报告
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | 内容展示 | https://www.baidu.com | 搜索框/按钮/结果列表/翻页 | [output/baidu](output/baidu) | **77.5** | 75.3 / 83.3 / 70.0 | 桌面84 / 移动70 | [report](reports/baidu/report.md) |
 | 2 | 表单交互 | 微信支付登录页 | 用户名/密码/验证码/登录 | [output/wxpay-login](output/wxpay-login) | **77.9** | 44.7 / 100 / 100 | 桌面62 | [report](reports/wxpay-login/report.md) |
-| 3 | 表单交互 | https://github.com/login | 用户名/密码/登录交互/必填校验 | [output/github-login](output/github-login) | **91.5** | 83.7 / 100 / 90.0 | 桌面62 | [report](reports/github-login/report.md) |
+| 3 | 表单交互 | https://github.com/login | 用户名/密码/登录交互/必填校验 | [output/github-login](output/github-login) | **93.6** | 88.9 / 100 / 90.0 | 桌面92 | [report](reports/github-login/report.md) |
 
 > 启动任一复刻产物：`cd output/<site> && npm install && npm run dev`。
 

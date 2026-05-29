@@ -2,6 +2,7 @@ import { useState } from 'react'
 import LoginForm from './components/LoginForm'
 import Footer from './components/Footer'
 import './App.css'
+import './components/styles.css'
 
 function App() {
   return (

@@ -71,6 +71,12 @@ def _build_prompt(scope: dict, capture_meta: dict, feedback: str | None) -> str:
 - 所有 import 必须真实存在；所有用到的变量/类型都要定义；不要留半成品代码。
 - React 18 写法，import 用 `import {{ useState }} from 'react'`。
 
+## 样式必须真正生效（极重要，否则视觉全错）
+- 每个 `.css` 文件都必须被某个 `.tsx`/`.ts` 文件 `import`（如 `import './styles.css'`），
+  否则 Vite 不会打包它，页面退化成浏览器默认样式（label 与 input 挤同行、按钮变小、布局错乱）。
+- 不要生成"孤儿 CSS"：写了样式文件却没人 import。每写一个样式文件，就在对应组件顶部加上它的 import。
+- 不要写空的或只有注释的 CSS 文件来占位。
+
 ## 输出格式（严格遵守）
 对每个文件，先输出一行 `===FILE: 相对路径===`，紧接其完整内容。
 必须包含: package.json、vite.config.ts、index.html、src/main.tsx、src/App.tsx 及所需样式/组件。
@@ -156,7 +162,56 @@ def generate(scope: dict, feedback: str | None = None, round_no: int = 0) -> Pat
         fp.write_text(body, encoding="utf-8")
 
     print(f"[generate] round{round_no} 写入 {len(files)} 个文件 -> {out}")
+    _ensure_css_imported(out)
     return out
+
+
+def _ensure_css_imported(out: Path) -> None:
+    """兜底：把没有被任何 .ts/.tsx import 的"孤儿 CSS"自动引入 App/main。
+
+    上游 prompt 已要求每个 .css 都被 import，但模型偶尔漏掉，导致样式不打包、
+    页面退化成默认样式。这里做确定性补救：扫描产物，发现孤儿 CSS 就追加 import。
+    """
+    src = out / "src"
+    if not src.exists():
+        return
+    css_files = [p for p in src.rglob("*.css")]
+    if not css_files:
+        return
+    code_files = list(src.rglob("*.tsx")) + list(src.rglob("*.ts"))
+    imported = "\n".join(p.read_text(encoding="utf-8", errors="ignore")
+                         for p in code_files)
+
+    # 选锚点：优先 App.tsx，其次 main.tsx
+    anchor = src / "App.tsx"
+    if not anchor.exists():
+        anchor = src / "main.tsx"
+    if not anchor.exists():
+        return
+
+    orphans = []
+    for css in css_files:
+        # 任意以该文件名结尾的 import 都算已引用（相对路径不一）
+        if f"{css.stem}.css" not in imported:
+            orphans.append(css)
+    if not orphans:
+        return
+
+    import os
+    lines = anchor.read_text(encoding="utf-8").splitlines()
+    inserts = []
+    for css in orphans:
+        rel = os.path.relpath(css, anchor.parent).replace(os.sep, "/")
+        if not rel.startswith("."):
+            rel = "./" + rel
+        inserts.append(f"import '{rel}'")
+    # 插到最后一个 import 行之后，保持文件头整洁
+    last_import = max((i for i, ln in enumerate(lines)
+                       if ln.lstrip().startswith("import ")), default=-1)
+    lines[last_import + 1:last_import + 1] = inserts
+    anchor.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"[generate] 兜底：为 {len(orphans)} 个孤儿 CSS 在 {anchor.name} 补 import "
+          f"({', '.join(c.name for c in orphans)})")
 
 
 if __name__ == "__main__":

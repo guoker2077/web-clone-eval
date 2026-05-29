@@ -1,26 +1,26 @@
 {
   "site_id": "github-login",
-  "score": 91.5,
+  "score": 93.6,
   "dimensions": {
-    "visual": 83.7,
+    "visual": 88.9,
     "functional": 100.0,
     "interaction": 90.0
   },
   "visual_detail": {
     "desktop": {
-      "ssim": 0.9065,
-      "pixel_diff_ratio": 0.0402,
-      "phash_distance": 20
+      "ssim": 0.899,
+      "pixel_diff_ratio": 0.0396,
+      "phash_distance": 8
     }
   },
   "llm_visual": {
     "desktop": {
-      "layout": 70,
-      "color": 60,
-      "typography": 65,
-      "components": 55,
-      "overall": 62,
-      "comment": "整体结构与元素齐全且居中布局相近，但复刻版缺少卡片宽度约束、绿色主按钮、社交按钮垂直堆叠及横向页脚，组件样式还原偏弱。"
+      "layout": 96,
+      "color": 88,
+      "typography": 90,
+      "components": 94,
+      "overall": 92,
+      "comment": "整体布局与组件高度还原，仅标题字重偏细、页脚链接颜色偏蓝有差异。"
     }
   },
   "coverage": {
