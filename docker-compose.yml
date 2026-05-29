@@ -1,0 +1,31 @@
+# web-clone-eval 一体化流水线运行环境
+#
+# 用法（在工程根目录）：
+#   构建镜像：     docker compose build
+#   跑闭环：       docker compose run --rm pipeline python run.py baidu --max-rounds 2
+#   合成 scope：   docker compose run --rm pipeline python synthesize_scope.py <url> "<范围>"
+#   预览复刻产物： docker compose run --rm --service-ports pipeline \
+#                    python -m http.server 8080 --directory /app/output/baidu/dist
+#
+# 密钥通过 env_file 注入（.env 已被 .gitignore 与 .dockerignore 排除，绝不入镜像）。
+# 产物目录以卷挂载到宿主机，容器删除后结果仍在本地。
+
+services:
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: web-clone-eval:latest
+    env_file:
+      - .env
+    volumes:
+      # 流水线产物落回宿主机，便于查看与提交
+      - ./output:/app/output
+      - ./reports:/app/reports
+      - ./prompts:/app/prompts
+      # scopes 双向挂载：宿主机新增/合成的 scope 立即对容器可见
+      - ./scopes:/app/scopes
+    # 预览复刻产物时用 --service-ports 暴露
+    ports:
+      - "8080:8080"
+    working_dir: /app/pipeline

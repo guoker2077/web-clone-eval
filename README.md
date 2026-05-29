@@ -57,15 +57,19 @@ web-clone-eval/
 ├─ reports/<site>/        # 评估报告 + 复刻页截图 + 历史
 ├─ prompts/<site>/        # 留存的 prompt 与 Claude 响应（体现 AI 使用过程）
 ├─ requirements.txt
+├─ Dockerfile             # 一体化运行镜像（Playwright+Node+中文字体）
+├─ docker-compose.yml     # 构建/运行编排（卷挂载产物、env_file 注入密钥）
+├─ .dockerignore
 ├─ .env.example
 └─ .gitignore
 ```
 
 ## 环境要求
 
-- Python 3.10+（建议用 venv）
-- Node.js 18+ 与 npm（用于构建复刻产物）
-- Claude API（官方 key 或兼容的中转平台）
+两种方式择一：
+
+- **Docker（推荐）**：只需 Docker（含 Compose）。环境全部打包，见下方「Docker 运行」。
+- **本地安装**：Python 3.10+（建议 venv）、Node.js 18+ 与 npm（构建复刻产物）、Claude API（官方 key 或兼容中转平台）。
 
 ## 快速开始
 
@@ -88,7 +92,36 @@ cd pipeline && python check_api.py
 python run.py baidu --max-rounds 3 --threshold 85
 ```
 
-## API 配置说明
+## Docker 运行（推荐，免装环境）
+
+把 Python 流水线、Node 构建链、版本匹配的 Playwright Chromium、中文字体一次性打包，
+避免本地踩浏览器内核下载与 CJK 字体「方框」的坑，也为云端托管提供可迁移的运行单元。
+
+```bash
+# 1. 配置密钥（.env 不会被打进镜像，运行时由 env_file 注入）
+cp .env.example .env   # 填入真实 token
+
+# 2. 构建镜像
+docker compose build
+
+# 3. 合成 scope（URL + 自然语言范围）
+docker compose run --rm pipeline \
+  python synthesize_scope.py https://github.com/login "复刻用户名/密码/登录按钮，验证登录与必填校验"
+
+# 4. 跑完整闭环（产物经卷挂载落回宿主机 output/ reports/ prompts/）
+docker compose run --rm pipeline python run.py github-login --max-rounds 2
+
+# 5. 预览复刻产物（暴露 8080 端口，浏览器访问 http://localhost:8080）
+docker compose run --rm --service-ports pipeline \
+  python -m http.server 8080 --directory /app/output/github-login/dist
+```
+
+> 镜像基于 Docker Hub 的 `python:3.11-slim`，构建期自行安装 Node.js、Playwright
+> Chromium（走 npmmirror 镜像）与中文字体——不依赖国内难拉的 `mcr.microsoft.com`，
+> 任何能访问 Docker Hub 的环境都能构建。`evaluate` 阶段构建复刻产物需要 npm/npx，
+> 已一并装入。产物目录与 `scopes/` 以卷挂载，容器删除后结果仍在本地。
+
+
 
 `.env` 支持两种鉴权方式（择一）：
 

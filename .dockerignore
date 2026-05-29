@@ -1,0 +1,36 @@
+# 绝不入镜像：密钥
+.env
+.env.local
+*.key
+
+# Python 本地虚拟环境与缓存
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 复刻产物的体积大头：依赖与构建输出（运行时由卷挂载/重新生成）
+**/node_modules/
+**/dist/
+**/.vite/
+output/
+reports/
+prompts/
+
+# 抓取中间产物
+**/_capture/
+**/.rounds/
+
+# git 与 IDE
+.git/
+.gitignore
+.idea/
+.vscode/
+*.log
+.DS_Store
+
+# Docker 自身与文档（按需，README 不必进镜像）
+Dockerfile
+docker-compose.yml
+.dockerignore
