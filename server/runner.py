@@ -11,6 +11,7 @@ worker、API 完全不用改。今天是子进程，明天是容器，接口一�
 """
 from __future__ import annotations
 
+import os
 import sys
 import traceback
 from pathlib import Path
@@ -20,6 +21,42 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "pipeline"))
 
 from server import jobstore  # noqa: E402
+
+
+def _apply_resource_limits() -> list[str]:
+    """给本 job 进程（及其 fork 出的 npm/chromium 子进程）套 POSIX 资源上限。
+
+    这是 L1 隔离——纯 setrlimit，无需 docker-in-docker，本地即可生效。limit 由
+    runner 自身设置，fork 出的子进程自动继承，故能罩住整条复刻链路。
+
+    仅当 JOB_RLIMIT 为真时启用（云端 worker 开；本地 CLI/调试默认关，避免误伤）。
+    刻意**不设** RLIMIT_AS/RLIMIT_DATA：Chromium 会映射巨量虚拟内存，地址空间
+    上限会直接把它搞崩。真正的内存上限交给容器层（L2 的 docker run --memory，
+    或云任务的容器规格），这里只管 CPU 时间 / 单文件大小 / 进程数。
+
+    返回已施加的限制描述（用于日志），未启用返回 []。
+    """
+    if os.environ.get("JOB_RLIMIT", "").lower() not in ("1", "true", "yes", "on"):
+        return []
+    import resource
+
+    applied: list[str] = []
+    cpu_sec = int(os.environ.get("JOB_CPU_SEC", "900"))        # CPU 时间上限
+    fsize_mb = int(os.environ.get("JOB_FSIZE_MB", "512"))      # 单文件大小上限
+    nproc = int(os.environ.get("JOB_NPROC", "512"))            # 进程数上限（反 fork 炸弹）
+
+    def _set(res, soft, hard, label):
+        try:
+            resource.setrlimit(res, (soft, hard))
+            applied.append(label)
+        except (ValueError, OSError):
+            pass  # 某些环境不允许设某项，跳过不致命
+
+    _set(resource.RLIMIT_CPU, cpu_sec, cpu_sec + 30, f"cpu={cpu_sec}s")
+    _set(resource.RLIMIT_FSIZE, fsize_mb << 20, fsize_mb << 20, f"fsize={fsize_mb}MB")
+    _set(resource.RLIMIT_NPROC, nproc, nproc, f"nproc={nproc}")
+    _set(resource.RLIMIT_CORE, 0, 0, "core=0")                 # 不写 core dump
+    return applied
 
 
 def _run_job(job_id: str) -> int:
@@ -36,6 +73,10 @@ def _run_job(job_id: str) -> int:
         jobstore.set_stage(job_id, stage)
         jobstore.add_log(job_id, message, stage=stage)
         print(f"[{stage}] {message}")
+
+    limits = _apply_resource_limits()
+    if limits:
+        progress("claimed", f"已套用资源上限：{', '.join(limits)}")
 
     try:
         from synthesize_scope import synthesize_scope

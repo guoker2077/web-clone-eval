@@ -16,11 +16,14 @@
 """
 from __future__ import annotations
 
+import os
+import secrets
 import sys
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -28,7 +31,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "pipeline"))
 
-from server import jobstore  # noqa: E402
+from server import jobstore, quota  # noqa: E402
 from ssrf_guard import SSRFError, assert_url_allowed, guard_enabled  # noqa: E402
 
 OUTPUT = ROOT / "output"
@@ -36,6 +39,35 @@ REPORTS = ROOT / "reports"
 STATIC = Path(__file__).resolve().parent / "static"
 
 app = FastAPI(title="web-clone-eval cloud", version="0.1")
+
+# ── 最小鉴权（HTTP Basic）────────────────────────────────────────────────
+# 设了 BASIC_AUTH_USER/PASS 就开，没设就关。理由：对外公开必须有门槛
+# （否则任何人都能消耗你的 Claude 额度），本地开发不设则零摩擦。
+_basic = HTTPBasic(auto_error=False)
+_AUTH_USER = os.environ.get("BASIC_AUTH_USER", "")
+_AUTH_PASS = os.environ.get("BASIC_AUTH_PASS", "")
+
+
+def require_auth(creds: HTTPBasicCredentials | None = Depends(_basic)) -> None:
+    """开启鉴权时校验 Basic 凭据；未配置用户名/密码则视为关闭，直接放行。"""
+    if not (_AUTH_USER and _AUTH_PASS):
+        return
+    ok = creds is not None and secrets.compare_digest(
+        creds.username, _AUTH_USER) and secrets.compare_digest(
+        creds.password, _AUTH_PASS)
+    if not ok:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "需要登录",
+            headers={"WWW-Authenticate": "Basic"})
+
+
+def _client_ip(request: Request) -> str:
+    """取客户端 IP：优先反代注入的 X-Forwarded-For 首段（云端/nginx 后），
+    否则用直连地址。"""
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 
 @app.on_event("startup")
@@ -51,7 +83,8 @@ class SubmitReq(BaseModel):
 
 
 @app.post("/api/jobs")
-def submit(req: SubmitReq) -> JSONResponse:
+def submit(req: SubmitReq, request: Request,
+           _: None = Depends(require_auth)) -> JSONResponse:
     url = req.url.strip()
     # 入口校验。基础：scheme 白名单。开启 SSRF_GUARD 后（云端 web 服务默认开），
     # 进一步解析 DNS 并拦截内网/云元数据/保留段地址——接入公网前的硬门槛。
@@ -62,19 +95,26 @@ def submit(req: SubmitReq) -> JSONResponse:
             raise HTTPException(400, str(e))
     elif not (url.startswith("http://") or url.startswith("https://")):
         raise HTTPException(400, "url 必须以 http:// 或 https:// 开头")
+    # 成本/滥用闸门：按 IP 限流 + 全局在途上限 + 每日总量（QUOTA_GUARD 开启时生效）
+    client_ip = _client_ip(request)
+    try:
+        quota.assert_within_quota(client_ip)
+    except quota.QuotaError as e:
+        raise HTTPException(e.status_code, e.message)
     job = jobstore.create_job(url, req.scope_text.strip(),
-                              max_rounds=req.max_rounds, threshold=req.threshold)
+                              max_rounds=req.max_rounds, threshold=req.threshold,
+                              client_ip=client_ip)
     return JSONResponse({"job_id": job["id"], "site_id": job["site_id"],
                          "status": job["status"]}, status_code=201)
 
 
 @app.get("/api/jobs")
-def jobs() -> dict:
+def jobs(_: None = Depends(require_auth)) -> dict:
     return {"jobs": jobstore.list_jobs()}
 
 
 @app.get("/api/jobs/{job_id}")
-def job_detail(job_id: str) -> dict:
+def job_detail(job_id: str, _: None = Depends(require_auth)) -> dict:
     job = jobstore.get_job(job_id)
     if job is None:
         raise HTTPException(404, "job 不存在")
@@ -85,7 +125,8 @@ def job_detail(job_id: str) -> dict:
 
 
 @app.get("/api/jobs/{job_id}/logs")
-def job_logs(job_id: str, after_id: int = 0) -> dict:
+def job_logs(job_id: str, after_id: int = 0,
+             _: None = Depends(require_auth)) -> dict:
     if jobstore.get_job(job_id) is None:
         raise HTTPException(404, "job 不存在")
     return {"logs": jobstore.get_logs(job_id, after_id=after_id)}
@@ -131,7 +172,7 @@ def report(site_id: str) -> Response:
 
 
 @app.get("/", response_class=HTMLResponse)
-def index() -> HTMLResponse:
+def index(_: None = Depends(require_auth)) -> HTMLResponse:
     return HTMLResponse((STATIC / "index.html").read_text(encoding="utf-8"))
 
 

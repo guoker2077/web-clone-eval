@@ -49,10 +49,20 @@ services:
   web:
     <<: *common
     working_dir: /app
-    # 面向陌生人：开启 SSRF 防御（拦内网/云元数据/保留段 IP）
+    # 面向陌生人：开启 SSRF 防御（拦内网/云元数据/保留段 IP）+ 提交配额闸门。
+    # 公开前务必设置 BASIC_AUTH_USER/PASS（在 .env 里），否则任何人都能刷你的额度。
     environment:
       JOBS_DB: /app/data/jobs.db
       SSRF_GUARD: "1"
+      # 成本/滥用闸门（按需在 .env 覆盖具体阈值）
+      QUOTA_GUARD: "1"
+      QUOTA_IP_MAX: "5"          # 单 IP 每窗口最多任务数
+      QUOTA_IP_WINDOW_SEC: "3600"
+      QUOTA_ACTIVE_MAX: "20"     # 全局在途上限（背压）
+      QUOTA_DAILY_MAX: "200"     # 全站每日总量（成本总闸）
+      # 最小鉴权：从 .env 读；留空则不启用（仅本地调试可留空）
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:-}
+      BASIC_AUTH_PASS: ${BASIC_AUTH_PASS:-}
     command: >
       uvicorn server.app:app --host 0.0.0.0 --port 8000
     ports:
@@ -62,10 +72,19 @@ services:
   worker:
     <<: *common
     working_dir: /app
-    # worker 抓取任意用户 URL，同样必须开 SSRF 防御
+    # worker 抓取任意用户 URL，同样必须开 SSRF 防御。
+    # JOB_RLIMIT 给 runner 子进程套 CPU/文件/进程数上限（反 fork 炸弹）。
+    # SANDBOX_MODE 默认 subprocess（同容器+rlimit 软隔离）；要强隔离改 docker，
+    # 但需给 worker 挂 docker.sock（见 README 加固章节，有提权代价）。
     environment:
       JOBS_DB: /app/data/jobs.db
       SSRF_GUARD: "1"
+      JOB_RLIMIT: "1"
+      JOB_CPU_SEC: "900"
+      JOB_FSIZE_MB: "512"
+      JOB_NPROC: "512"
+      JOB_TIMEOUT_SEC: "1800"
+      SANDBOX_MODE: ${SANDBOX_MODE:-subprocess}
     command: >
       python -m server.worker
     # worker 不对外暴露端口；通过 data 卷与 web 共享队列

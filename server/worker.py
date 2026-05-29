@@ -29,13 +29,52 @@ from server import jobstore  # noqa: E402
 POLL_INTERVAL = float(os.environ.get("WORKER_POLL_SEC", "2.0"))
 JOB_TIMEOUT = float(os.environ.get("JOB_TIMEOUT_SEC", "1800"))  # 单 job 墙钟上限
 
+# 沙箱模式：subprocess（默认，本地骨架）| docker（每 job 一次性容器，强隔离）
+SANDBOX_MODE = os.environ.get("SANDBOX_MODE", "subprocess").lower()
+SANDBOX_IMAGE = os.environ.get("SANDBOX_IMAGE", "web-clone-eval:latest")
+SANDBOX_MEMORY = os.environ.get("SANDBOX_MEMORY", "2g")
+SANDBOX_CPUS = os.environ.get("SANDBOX_CPUS", "2")
+SANDBOX_PIDS = os.environ.get("SANDBOX_PIDS", "512")
+
 
 def _runner_cmd(job_id: str) -> list[str]:
     """构造 runner 调用命令。
 
-    上云时这里整体替换为 docker run（带 --network、--memory、--cpus、--read-only
-    等沙箱/限额参数），其余逻辑不变。本地骨架直接用当前 Python 解释器跑。
+    两种模式（SANDBOX_MODE 控制）：
+      subprocess（默认）—— 当前 Python 解释器直接跑 runner；轻、零依赖，但与
+        worker 同容器、共享内核与资源。配合 runner 内的 setrlimit（JOB_RLIMIT）
+        做进程级软隔离。本地骨架与单机部署够用。
+      docker —— 每个 job 关进一次性容器：--rm 用后即焚、--memory/--cpus/--pids-limit
+        硬限资源、--cap-drop=ALL 去能力、--security-opt no-new-privileges 禁提权。
+        强隔离，代价是 worker 需能调宿主 docker（挂 /var/run/docker.sock，本身是
+        提权面，生产建议换 rootless docker 或云任务 API）。
+
+    上云时整体替换为云任务 API（Cloud Run Job / Fargate / k8s Job），由平台做
+    资源&网络隔离，无需共享 docker daemon。worker/API 逻辑不变。
     """
+    if SANDBOX_MODE == "docker":
+        # 把队列 DB 与产物目录挂进沙箱容器，使其与 worker 共享同一份数据卷。
+        # 这些路径在 compose 里与宿主机 bind-mount 对齐（见 docker-compose.yml）。
+        return [
+            "docker", "run", "--rm",
+            "--memory", SANDBOX_MEMORY,
+            "--cpus", SANDBOX_CPUS,
+            "--pids-limit", SANDBOX_PIDS,
+            "--cap-drop", "ALL",
+            "--security-opt", "no-new-privileges",
+            "-e", f"JOBS_DB={os.environ.get('JOBS_DB', '/app/data/jobs.db')}",
+            "-e", "SSRF_GUARD=1",
+            "-e", "JOB_RLIMIT=1",
+            "--env-file", str(ROOT / ".env"),
+            "-v", f"{ROOT}/data:/app/data",
+            "-v", f"{ROOT}/output:/app/output",
+            "-v", f"{ROOT}/reports:/app/reports",
+            "-v", f"{ROOT}/prompts:/app/prompts",
+            "-v", f"{ROOT}/scopes:/app/scopes",
+            "-w", "/app",
+            SANDBOX_IMAGE,
+            "python", "-m", "server.runner", job_id,
+        ]
     return [sys.executable, "-m", "server.runner", job_id]
 
 
@@ -85,7 +124,8 @@ def main() -> None:
     n = jobstore.requeue_stale(JOB_TIMEOUT)
     if n:
         print(f"[worker] 退回 {n} 条超时 running job")
-    print(f"[worker] {worker_id} 上线，轮询间隔 {POLL_INTERVAL}s，job 超时 {JOB_TIMEOUT}s")
+    print(f"[worker] {worker_id} 上线，轮询间隔 {POLL_INTERVAL}s，job 超时 {JOB_TIMEOUT}s，"
+          f"沙箱模式={SANDBOX_MODE}")
 
     stop = {"flag": False}
 

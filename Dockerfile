@@ -13,13 +13,16 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     NPM_CONFIG_REGISTRY=https://registry.npmmirror.com \
     # Playwright 浏览器内核走淘宝镜像
-    PLAYWRIGHT_DOWNLOAD_HOST=https://registry.npmmirror.com/-/binary/playwright
+    PLAYWRIGHT_DOWNLOAD_HOST=https://registry.npmmirror.com/-/binary/playwright \
+    # 浏览器装到共享路径（非 root 用户也能读），而非 root 家目录
+    PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
 
 # 1) 系统依赖 + Node.js + 中文字体
 #    - curl/gnupg：装 NodeSource
 #    - fonts-noto-cjk：CJK 字体，修复截图方框
+#    - util-linux：提供 setpriv，入口脚本降权用
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        curl gnupg ca-certificates fontconfig fonts-noto-cjk \
+        curl gnupg ca-certificates fontconfig fonts-noto-cjk util-linux \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && fc-cache -f \
@@ -32,15 +35,26 @@ COPY requirements.txt ./
 RUN pip install -r requirements.txt
 
 # 3) Playwright Chromium 及其运行所需系统库
-#    playwright install --with-deps 会自动补齐 Chromium 的系统依赖
-RUN playwright install --with-deps chromium
+#    playwright install --with-deps chromium 会自动补齐 Chromium 的系统依赖。
+#    装到 /opt/pw-browsers（见上 ENV），并放开读权限，非 root 用户也能启动浏览器。
+RUN playwright install --with-deps chromium \
+    && chmod -R a+rX /opt/pw-browsers
 
 # 4) 流水线源码与 scopes（产物目录运行时由卷挂载/生成，已在 .dockerignore 排除）
 COPY pipeline/ ./pipeline/
 COPY scopes/ ./scopes/
 COPY server/ ./server/
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# 5) 非 root 运行用户（缩小被攻破影响面；根治产物被 root 占有的问题）。
+#    入口脚本以 root 起、修正卷属主后 setpriv 降到该用户；故镜像默认仍 root 启动，
+#    由 entrypoint 完成降权。app 用户家目录给 npm/playwright 缓存用。
+RUN groupadd -g 1000 app && useradd -u 1000 -g 1000 -m -s /bin/bash app \
+    && chown -R app:app /app
 
 WORKDIR /app/pipeline
 
-# 工具型镜像，不设固定入口，运行时按需传命令（用法见 README Docker 章节）
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+# 工具型镜像，不设固定入口命令，运行时按需传命令（用法见 README Docker 章节）
 CMD ["python", "-c", "print('web-clone-eval image ready. 用法见 README Docker 章节。')"]

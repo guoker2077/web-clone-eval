@@ -52,10 +52,11 @@ web-clone-eval/
 │  ├─ run.py              # ④ 总控闭环
 │  └─ check_api.py        # API 连通性自测
 ├─ server/                # 云端异步服务（提交→后台跑→轮询→预览）
-│  ├─ app.py              #   FastAPI：提交/查询/进度 API + 预览路由 + UI
-│  ├─ worker.py           #   worker：认领队列任务，子进程跑 runner
-│  ├─ runner.py           #   单 job 执行体（合成+闭环），进度回写
-│  ├─ jobstore.py         #   SQLite 任务库+队列（WAL+原子认领）
+│  ├─ app.py              #   FastAPI：提交/查询/进度 API + 预览路由 + UI（含鉴权）
+│  ├─ worker.py           #   worker：认领队列任务，子进程/docker 沙箱跑 runner
+│  ├─ runner.py           #   单 job 执行体（合成+闭环），进度回写 + setrlimit
+│  ├─ jobstore.py         #   SQLite 任务库+队列（WAL+原子认领）+ 配额计数
+│  ├─ quota.py            #   提交闸门：IP 限流/在途上限/每日总量
 │  └─ static/             #   最小交互界面（表单+轮询+一键跳转）
 ├─ scopes/                # 每个站点一份 scope.json（唯一人工输入）
 ├─ output/<site>/         # 复刻产物（独立可运行的 Vite 工程）
@@ -63,7 +64,8 @@ web-clone-eval/
 ├─ reports/<site>/        # 评估报告 + 复刻页截图 + 历史
 ├─ prompts/<site>/        # 留存的 prompt 与 Claude 响应（体现 AI 使用过程）
 ├─ requirements.txt
-├─ Dockerfile             # 一体化运行镜像（Playwright+Node+中文字体）
+├─ Dockerfile             # 一体化运行镜像（Playwright+Node+中文字体，非 root）
+├─ docker-entrypoint.sh   # 入口：修正卷属主后降权到非 root 运行
 ├─ docker-compose.yml     # 构建/运行编排（卷挂载产物、env_file 注入密钥）
 ├─ .dockerignore
 ├─ .env.example
@@ -168,10 +170,10 @@ JOBS_DB="$PWD/server/jobs.db" .venv/bin/python -m server.worker
 关键接口：`POST /api/jobs`（提交）、`GET /api/jobs/{id}`（状态/分数）、
 `GET /api/jobs/{id}/logs?after_id=N`（增量进度）、`GET /preview/{site}/`（预览产物）。
 
-> 当前为**本地骨架**：单 worker 串行、SQLite 当队列、子进程当沙箱。
-> 已完成**第一项对外加固——SSRF 防御**（见下「SSRF 防御」）。
-> 仍待补两项：每 job 沙箱容器（资源/网络限制）、限流与配额（防滥用与成本失控）。
-> worker 调 runner 的子进程边界即为未来 `docker run` 沙箱的接入点。
+> **加固状态**：骨架已补齐对外开放所需的三项加固——
+> ① SSRF 防御、② 进程隔离 + 非 root 容器、③ 限流/配额/最小鉴权（见下）。
+> 仍为**单机形态**：单 worker、SQLite 当队列、子进程（或可选 docker）当沙箱；
+> 上云只需「换组件不改逻辑」（见「上云部署」）。
 
 ### SSRF 防御（拦内网 / 云元数据 / 重定向）
 
@@ -197,7 +199,85 @@ JOBS_DB="$PWD/server/jobs.db" .venv/bin/python -m server.worker
 > 与网络层（worker 私有子网 + 出口过滤）配合构成纵深防御：即便应用层被绕过，
 > 网络层仍兜底拦截。
 
-`.env` 支持两种鉴权方式（择一）：
+### 进程隔离 + 非 root 容器（限资源、缩影响面）
+
+抓取陌生人页面的进程不该是 root，也不该能拖垮整机。两层：
+
+1. **非 root 运行**：镜像建 `app`（UID 1000）用户；容器以 root 起、入口脚本
+   （`docker-entrypoint.sh`）先把挂载卷属主 `chown` 给 app、再 `setpriv` 降权执行。
+   这同时**根治了产物被 root 占有、宿主机普通用户删不掉**的问题。
+2. **资源上限**：`runner` 跑 job 前用 `setrlimit` 限 CPU 时间 / 单文件大小 / 进程数
+   （**反 fork 炸弹**），子进程（npm/chromium）自动继承。开关 `JOB_RLIMIT`，
+   阈值见 `JOB_CPU_SEC / JOB_FSIZE_MB / JOB_NPROC`。
+   > 刻意不设地址空间上限（`RLIMIT_AS`）——Chromium 映射巨量虚拟内存，会被它搞崩；
+   > 内存上限交给容器层（下方 docker 沙箱的 `--memory`，或云任务规格）。
+
+可选**强隔离**：把 worker 的 `SANDBOX_MODE` 设为 `docker`，则每个 job 关进一次性
+容器（`docker run --rm --memory --cpus --pids-limit --cap-drop=ALL
+--security-opt no-new-privileges`）。代价是 worker 需能调宿主 docker（挂
+`/var/run/docker.sock`，本身是提权面）——单机演示够用，生产建议换 rootless docker
+或直接用云任务 API（见「上云部署」）。默认 `subprocess`（同容器 + setrlimit 软隔离）。
+
+### 限流 / 配额 / 最小鉴权（防滥用与成本失控）
+
+每个 job 都是真金白银的 Claude 调用，对外开放后必须设闸：
+
+- **最小鉴权（HTTP Basic）**：设了 `BASIC_AUTH_USER/PASS` 就开、留空就关。
+  **公开到公网前必设**，否则任何人都能刷你的额度。本地调试可留空、零摩擦。
+- **三道配额闸**（`QUOTA_GUARD=1` 开启，`server/quota.py`）：
+  ① 按 IP 限流（`QUOTA_IP_MAX` / `QUOTA_IP_WINDOW_SEC`，挡单点刷量）；
+  ② 全局在途上限（`QUOTA_ACTIVE_MAX`，队列背压）；
+  ③ 每日总量上限（`QUOTA_DAILY_MAX`，成本总闸）。超限返回 `429` + 可读消息。
+
+计数现落 SQLite，上云原样换 Redis 的原子 `INCR`+TTL，逻辑不变。
+另强烈建议在 Claude 平台侧设**账单告警/预算上限**作为最后一道兜底。
+
+### 服务端环境变量一览
+
+| 变量 | 默认 | 作用 | 谁用 |
+| --- | --- | --- | --- |
+| `SSRF_GUARD` | 关 | 开启 SSRF 防御 | web/worker |
+| `BASIC_AUTH_USER/PASS` | 空 | Basic 鉴权账号密码（留空=关） | web |
+| `QUOTA_GUARD` | 关 | 开启配额闸门 | web |
+| `QUOTA_IP_MAX` / `QUOTA_IP_WINDOW_SEC` | 5 / 3600 | 单 IP 每窗口任务上限 | web |
+| `QUOTA_ACTIVE_MAX` | 20 | 全局在途上限 | web |
+| `QUOTA_DAILY_MAX` | 200 | 全站每日总量 | web |
+| `JOB_RLIMIT` | 关 | 给 job 套 setrlimit | worker |
+| `JOB_CPU_SEC` / `JOB_FSIZE_MB` / `JOB_NPROC` | 900 / 512 / 512 | 各项资源上限 | worker |
+| `JOB_TIMEOUT_SEC` | 1800 | 单 job 墙钟上限 | worker |
+| `SANDBOX_MODE` | subprocess | `docker`=每 job 一次性容器 | worker |
+
+> `docker compose up web worker` 已在 compose 里把 SSRF/配额/rlimit 默认打开；
+> 只需在 `.env` 补 `BASIC_AUTH_USER/PASS` 即可公开。
+
+### 上云部署（单机 CVM 起步 → 托管件按需替换）
+
+整套已 Docker 化，**最小上云路径＝一台云服务器 + docker compose**：
+
+```bash
+# 在云服务器上（建议 ≥4GB 内存，Playwright+npm 构建吃内存）
+git clone <repo> && cd web-clone-eval
+cp .env.example .env       # 填 Claude token + BASIC_AUTH_USER/PASS
+docker compose build
+docker compose up -d web worker
+# 前置 nginx 反代 + 域名 + TLS（Let's Encrypt），把 80/443 转到 web 的 8000
+```
+
+> nginx 记得透传 `X-Forwarded-For`，配额限流才能拿到真实客户端 IP。
+
+要减运维时，按下表「换组件不改逻辑」逐步托管化（如腾讯云：web 上**云托管**容器
+PaaS、产物丢 **COS + CDN**、队列换托管 **Redis**；worker 因是重算力后台任务，
+更适合常驻容器/云任务而非函数）：
+
+| 单机现状 | 托管替换 | 收益 |
+| --- | --- | --- |
+| 子进程 / docker 沙箱 | 云任务（Cloud Run Job / Fargate / k8s Job） | 原生资源&网络隔离，无需挂 docker.sock |
+| SQLite 队列+计数 | Redis（队列+限流）+ Postgres（状态） | 多实例并发、横向扩 worker |
+| 产物卷挂载 | 对象存储（COS/S3）+ CDN + 独立域名 | 预览各占 origin，省掉 asset 路径重写 |
+| `.env` 注入 | Secret Manager | 密钥不落盘 |
+| 应用层 SSRF | + worker 私有子网 + 出口过滤 | 纵深防御 |
+
+
 
 | 场景 | 变量 |
 | --- | --- |

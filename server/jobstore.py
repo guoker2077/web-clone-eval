@@ -52,6 +52,7 @@ def init_db() -> None:
                 stage        TEXT NOT NULL DEFAULT 'queued',
                 score        REAL,
                 error        TEXT,
+                client_ip    TEXT,
                 created_at   REAL NOT NULL,
                 started_at   REAL,
                 finished_at  REAL,
@@ -69,6 +70,13 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_logs_job ON job_logs(job_id, id);
             """
         )
+        # 兼容旧库：早期 jobs 表没有 client_ip 列，补加（已存在则忽略）
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(jobs)")}
+        if "client_ip" not in cols:
+            conn.execute("ALTER TABLE jobs ADD COLUMN client_ip TEXT")
+        # client_ip 列就绪后再建其索引（旧库 ALTER 之后才存在该列）
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_jobs_ip ON jobs(client_ip, created_at)")
 
 
 def _slug_from_url(url: str) -> str:
@@ -83,7 +91,7 @@ def _slug_from_url(url: str) -> str:
 
 
 def create_job(url: str, scope_text: str, *, max_rounds: int = 2,
-               threshold: float = 85.0) -> dict[str, Any]:
+               threshold: float = 85.0, client_ip: str | None = None) -> dict[str, Any]:
     """建一条 job。site_id 用 slug + job 短 id 命名空间化，避免并发同 URL 互相覆盖。"""
     job_id = uuid.uuid4().hex
     site_id = f"{_slug_from_url(url)}-{job_id[:8]}"
@@ -91,11 +99,40 @@ def create_job(url: str, scope_text: str, *, max_rounds: int = 2,
     with _connect() as conn:
         conn.execute(
             "INSERT INTO jobs(id, site_id, url, scope_text, max_rounds, threshold,"
-            " status, stage, created_at) VALUES(?,?,?,?,?,?,'queued','queued',?)",
-            (job_id, site_id, url, scope_text, max_rounds, threshold, now),
+            " status, stage, client_ip, created_at)"
+            " VALUES(?,?,?,?,?,?,'queued','queued',?,?)",
+            (job_id, site_id, url, scope_text, max_rounds, threshold, client_ip, now),
         )
     add_log(job_id, "已入队，等待 worker 认领", stage="queued")
     return get_job(job_id)
+
+
+def count_jobs_by_ip_since(client_ip: str, since: float) -> int:
+    """某 IP 在 since 时间点之后提交的 job 数（按 IP 限流用）。"""
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM jobs WHERE client_ip=? AND created_at>=?",
+            (client_ip, since),
+        ).fetchone()
+    return int(row["n"])
+
+
+def count_active_jobs() -> int:
+    """全局在途（未达终态）job 数（在途上限/队列满判断用）。"""
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM jobs WHERE status NOT IN ('done','failed')"
+        ).fetchone()
+    return int(row["n"])
+
+
+def count_jobs_since(since: float) -> int:
+    """全站在 since 之后提交的 job 数（每日总量上限用）。"""
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM jobs WHERE created_at>=?", (since,)
+        ).fetchone()
+    return int(row["n"])
 
 
 def claim_next(worker: str) -> dict[str, Any] | None:
