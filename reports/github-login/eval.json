@@ -1,0 +1,99 @@
+{
+  "site_id": "github-login",
+  "score": 91.5,
+  "dimensions": {
+    "visual": 83.7,
+    "functional": 100.0,
+    "interaction": 90.0
+  },
+  "visual_detail": {
+    "desktop": {
+      "ssim": 0.9065,
+      "pixel_diff_ratio": 0.0402,
+      "phash_distance": 20
+    }
+  },
+  "llm_visual": {
+    "desktop": {
+      "layout": 70,
+      "color": 60,
+      "typography": 65,
+      "components": 55,
+      "overall": 62,
+      "comment": "整体结构与元素齐全且居中布局相近，但复刻版缺少卡片宽度约束、绿色主按钮、社交按钮垂直堆叠及横向页脚，组件样式还原偏弱。"
+    }
+  },
+  "coverage": {
+    "element_presence": 1.0,
+    "behavior_pass": 1.0,
+    "assert_pass": 1.0,
+    "detail": {
+      "el_ok": 4,
+      "el_total": 4,
+      "bh_ok": 2,
+      "bh_total": 2,
+      "assert_ok": 5,
+      "assert_total": 5
+    }
+  },
+  "behaviors": {
+    "features": {
+      "login-flow": {
+        "asserts": [
+          {
+            "step": "fill(username='octocat')",
+            "ok": true
+          },
+          {
+            "step": "fill(password='Secret1234')",
+            "ok": true
+          },
+          {
+            "step": "click(submit-button)",
+            "ok": true
+          }
+        ],
+        "passed": 3,
+        "total": 3,
+        "ok": true
+      },
+      "empty-validation": {
+        "asserts": [
+          {
+            "step": "click(submit-button)",
+            "ok": true
+          },
+          {
+            "step": "expect_visible(username)",
+            "ok": true
+          }
+        ],
+        "passed": 2,
+        "total": 2,
+        "ok": true
+      }
+    },
+    "elements": {
+      "username": true,
+      "password": true,
+      "submit-button": true,
+      "signup-link": true
+    },
+    "states": {
+      "username": {
+        "focus_changes_style": true
+      },
+      "password": {
+        "focus_changes_style": true
+      },
+      "submit-button": {
+        "focus_changes_style": false
+      }
+    }
+  },
+  "weights": {
+    "visual": 0.4,
+    "functional": 0.4,
+    "interaction": 0.2
+  }
+}

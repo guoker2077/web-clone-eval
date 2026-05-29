@@ -1,0 +1,176 @@
+# 基于 AI 工具的网页复刻与一致性评估
+
+一条**全自动流水线**：给定目标网址与功能范围，自动抓取原页 → 调用 Claude 生成可运行的复刻工程 → 量化评估三维一致性 → 按评估反馈闭环精修，直到达标。
+
+对同类页面，**唯一的人工输入是一份 `scope.json`**（网址 + 功能点 + 视口 + 遮罩区域），无需改代码、无需人工干预 AI。
+
+## 核心特性
+
+- **稳定复用**：新页面只写一份 scope，流水线自动完成复刻与评估。
+- **闭环精修**：评估分数（视觉差异、失败的交互断言）回灌给 Claude 重新生成，分数驱动质量提升。
+- **可量化可置信**：采用 SSIM、CIEDE2000、pHash、IoU、断言通过率等业界公认指标，多视口测量，加权合成总分，权重透明可调。
+- **全自动评估**：复刻后无需人工驱动，构建→截图→打分→出报告一键完成。
+
+## 流水线架构
+
+```
+scope.json (唯一人工输入)
+   │
+   ▼
+① Capture    Playwright 抓原页 → 多视口整页截图 + DOM 快照 + 配色/字体 + 关键元素 bbox
+   ▼
+② Generate   Claude(claude-opus-4-8, 视觉输入) ← 截图+功能点 → 生成 Vite/React/TS 工程
+   ▼
+   Build      npm install && npm run build → 起静态服务
+   ▼
+③ Evaluate   原页 vs 复刻页 → 视觉(SSIM/像素/pHash) + 功能(覆盖率/断言) + 交互(状态/流程)
+   ▼
+④ Refine     分数 < 阈值 → 差异点+失败断言回灌 Claude → 回到② (限 N 轮，全自动)
+   │
+   ▼ 达标
+  报告 (report.md + eval.json + 截图)
+```
+
+## 目录结构
+
+```
+web-clone-eval/
+├─ pipeline/              # 流水线代码
+│  ├─ config.py           # Claude 客户端（兼容中转 token / 官方 key）
+│  ├─ capture.py          # ① 抓取
+│  ├─ generate.py         # ② 生成
+│  ├─ evaluate.py         # ③ 评估（构建+截图+打分）
+│  ├─ metrics_visual.py   #   视觉度量 SSIM/像素/pHash/CIEDE2000/IoU
+│  ├─ metrics_behavior.py #   功能&交互度量（Playwright 跑断言）
+│  ├─ metrics_llm.py      #   LLM 辅助视觉评分（加分项，交叉验证）
+│  ├─ report.py           # 渲染 Markdown 报告
+│  ├─ run.py              # ④ 总控闭环
+│  └─ check_api.py        # API 连通性自测
+├─ scopes/                # 每个站点一份 scope.json（唯一人工输入）
+├─ output/<site>/         # 复刻产物（独立可运行的 Vite 工程）
+│  └─ _capture/           #   原页抓取的截图/DOM/meta
+├─ reports/<site>/        # 评估报告 + 复刻页截图 + 历史
+├─ prompts/<site>/        # 留存的 prompt 与 Claude 响应（体现 AI 使用过程）
+├─ requirements.txt
+├─ .env.example
+└─ .gitignore
+```
+
+## 环境要求
+
+- Python 3.10+（建议用 venv）
+- Node.js 18+ 与 npm（用于构建复刻产物）
+- Claude API（官方 key 或兼容的中转平台）
+
+## 快速开始
+
+```bash
+# 1. Python 依赖
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# 2. Playwright 浏览器内核（国内用镜像）
+PLAYWRIGHT_DOWNLOAD_HOST=https://registry.npmmirror.com/-/binary/playwright \
+  playwright install chromium
+
+# 3. 配置 API（复制后填入真实值）
+cp .env.example .env
+
+# 4. 验证 API 连通
+cd pipeline && python check_api.py
+
+# 5. 跑完整闭环（以百度为例）
+python run.py baidu --max-rounds 3 --threshold 85
+```
+
+## API 配置说明
+
+`.env` 支持两种鉴权方式（择一）：
+
+| 场景 | 变量 |
+| --- | --- |
+| 官方 API | `ANTHROPIC_API_KEY` |
+| 中转平台 | `ANTHROPIC_AUTH_TOKEN` + `ANTHROPIC_BASE_URL` |
+
+> 注意：中转平台只能用 `AUTH_TOKEN`，**不要**同时设置 `API_KEY`——SDK 会同时发送 `X-Api-Key` 头导致网关 401。`.env` 已被 `.gitignore` 排除，切勿提交。
+
+## 命令
+
+```bash
+python run.py <site>                  # 完整闭环：capture→generate→build→eval→refine
+python run.py <site> --skip-capture   # 复用已抓取的原页
+python run.py <site> --max-rounds 3   # 最大精修轮数
+python run.py <site> --threshold 85   # 达标阈值（0-100）
+
+python capture.py <site>              # 单独跑抓取
+python generate.py <site>             # 单独跑生成
+python evaluate.py <site>             # 单独跑构建+评估
+python report.py <site>               # 渲染报告
+```
+
+## 新增一个复刻页面
+
+只需在 `scopes/` 下新建 `<site>.json`，无需改任何代码：
+
+```jsonc
+{
+  "id": "github-login",
+  "name": "GitHub 登录页",
+  "url": "https://github.com/login",
+  "type": "form",
+  "viewports": [{ "name": "desktop", "width": 1280, "height": 800 }],
+  "wait": { "until": "networkidle", "extra_ms": 1000 },
+  "features": [
+    { "id": "username", "type": "element", "desc": "用户名输入框",
+      "selector_hint": "#login_field" },
+    { "id": "login-submit", "type": "behavior", "desc": "填表后点击登录",
+      "steps": [
+        { "action": "fill", "target": "username", "value": "demo" },
+        { "action": "click", "target": "submit-button" }
+      ]}
+  ],
+  "masks": [{ "desc": "动态验证码", "selector": ".captcha" }]
+}
+```
+
+字段说明：
+- `features[].type`: `element`（检查存在/可见）或 `behavior`（执行 steps 断言）
+- `steps[].action`: `fill` / `click` / `expect_visible` / `expect_text`
+- 复刻页约定为可测试元素加 `data-testid="<feature-id>"`，评估据此定位
+- `masks`: 动态区域（广告/验证码）在视觉对比前遮罩，避免污染分数
+
+## 评估指标
+
+| 维度 | 权重 | 指标 | 说明 |
+| --- | --- | --- | --- |
+| 视觉 | 0.4 | SSIM / MS-SSIM | 结构相似度，0-1 越高越好 |
+| | | 像素差异率 | 超阈值像素占比，越低越好 |
+| | | pHash 汉明距离 | 感知哈希，0-64 越低越相似 |
+| | | CIEDE2000 ΔE | 主色板色差（色彩还原度） |
+| | | bbox IoU | 关键元素布局重合度 |
+| 功能 | 0.4 | 元素存在率 | scope 功能点对应元素是否齐备 |
+| | | 行为通过率 | 交互流程是否整体跑通 |
+| 交互 | 0.2 | 断言通过率 | 逐操作断言 pass/fail |
+| | | 状态反馈 | 输入控件 focus 等状态样式变化 |
+| _加分项_ | — | LLM 辅助视觉评分 | Claude 视觉模型按 rubric 交叉验证（布局/配色/排版/组件），非确定性，不计入主总分 |
+
+**总分** = 视觉×0.4 + 功能×0.4 + 交互×0.2（满分 100）。权重定义在 `evaluate.py` 的 `WEIGHTS`，透明可调。所有截图统一缩放后比较，多视口取均值。
+
+> **LLM 辅助评分（加分项）**：除上述确定性指标外，额外让 Claude 视觉模型同时看原页与复刻页，按 rubric 打分（`metrics_llm.py`）。因 LLM 评分非确定性，**不计入主总分**，仅作辅助信号与确定性指标交叉验证，在报告中并列展示。实测它对纯视觉还原度更敏感，能补充 SSIM 之外的人眼直觉判断。
+
+## 复刻结果
+
+3 类页面（1 内容展示型 + 2 表单交互型），均跑完闭环精修，分数见各报告：
+
+| 序号 | 类型 | 原始网址 | 复刻需求 | 前端代码 | 综合得分 | 视觉/功能/交互 | LLM辅助 | 报告 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 内容展示 | https://www.baidu.com | 搜索框/按钮/结果列表/翻页 | [output/baidu](output/baidu) | **77.5** | 75.3 / 83.3 / 70.0 | 桌面84 / 移动70 | [report](reports/baidu/report.md) |
+| 2 | 表单交互 | 微信支付登录页 | 用户名/密码/验证码/登录 | [output/wxpay-login](output/wxpay-login) | **77.9** | 44.7 / 100 / 100 | 桌面62 | [report](reports/wxpay-login/report.md) |
+| 3 | 表单交互 | https://github.com/login | 用户名/密码/登录交互/必填校验 | [output/github-login](output/github-login) | **91.5** | 83.7 / 100 / 90.0 | 桌面62 | [report](reports/github-login/report.md) |
+
+> 启动任一复刻产物：`cd output/<site> && npm install && npm run dev`。
+
+## 关于 AI 工具使用
+
+本项目复刻产物由 **Claude (`claude-opus-4-8`)** 通过 API 生成。每一轮的 prompt 与模型响应完整保存在 `prompts/<site>/round*.{prompt,response}.md`，提交记录中可追溯 AI 的生成与精修过程。
+

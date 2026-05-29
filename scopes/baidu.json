@@ -1,0 +1,56 @@
+{
+  "id": "baidu",
+  "name": "百度首页",
+  "url": "https://www.baidu.com",
+  "type": "content",
+  "viewports": [
+    { "name": "desktop", "width": 1280, "height": 800 },
+    { "name": "mobile", "width": 390, "height": 844 }
+  ],
+  "wait": {
+    "until": "networkidle",
+    "extra_ms": 1500
+  },
+  "features": [
+    {
+      "id": "search-input",
+      "desc": "顶部搜索输入框，可聚焦输入文字",
+      "selector_hint": "#chat-textarea, #kw, input[name=wd], textarea",
+      "type": "element"
+    },
+    {
+      "id": "search-button",
+      "desc": "搜索按钮（百度一下），点击触发搜索",
+      "selector_hint": "#su, .s_btn, button[type=submit]",
+      "type": "element"
+    },
+    {
+      "id": "search-submit",
+      "desc": "在输入框输入关键词后点击搜索按钮，结果区出现与关键词相关的结果文案",
+      "type": "behavior",
+      "steps": [
+        { "action": "fill", "target": "search-input", "value": "天气" },
+        { "action": "click", "target": "search-button" },
+        { "action": "expect_visible", "target": "result-list" }
+      ]
+    },
+    {
+      "id": "result-list",
+      "desc": "搜索结果列表，每条含标题与摘要文案",
+      "type": "element"
+    },
+    {
+      "id": "pagination",
+      "desc": "结果列表底部翻页控件，可点击下一页加载下一批结果",
+      "type": "behavior",
+      "steps": [
+        { "action": "click", "target": "next-page" },
+        { "action": "expect_visible", "target": "result-list" }
+      ]
+    }
+  ],
+  "masks": [
+    { "desc": "首页可能出现的运营/广告浮层", "selector": ".s-top-right, .s_login_wrapper" }
+  ],
+  "notes": "内容展示型。结果数据可用本地模拟数据，重点在搜索→结果→翻页的交互闭环与视觉还原。"
+}

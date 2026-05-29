@@ -1,0 +1,27 @@
+{
+  "history": [
+    {
+      "round": 0,
+      "score": 78.1,
+      "dimensions": {
+        "visual": 77.0,
+        "functional": 83.3,
+        "interaction": 70.0
+      }
+    },
+    {
+      "round": 1,
+      "error": "Command '['npm', 'run', 'build']' returned non-zero exit status 2."
+    },
+    {
+      "round": 2,
+      "score": 79.6,
+      "dimensions": {
+        "visual": 80.6,
+        "functional": 83.3,
+        "interaction": 70.0
+      }
+    }
+  ],
+  "best_score": 79.6
+}

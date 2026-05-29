@@ -1,0 +1,60 @@
+{
+  "id": "github-login",
+  "name": "GitHub 登录页",
+  "url": "https://github.com/login",
+  "type": "form",
+  "viewports": [
+    { "name": "desktop", "width": 1280, "height": 800 }
+  ],
+  "wait": {
+    "until": "domcontentloaded",
+    "extra_ms": 1500
+  },
+  "features": [
+    {
+      "id": "username",
+      "desc": "Username or email address 输入框",
+      "selector_hint": "#login_field, input[name=login]",
+      "type": "element"
+    },
+    {
+      "id": "password",
+      "desc": "Password 输入框，type=password，上方有 Forgot password 链接",
+      "selector_hint": "#password, input[name=password]",
+      "type": "element"
+    },
+    {
+      "id": "submit-button",
+      "desc": "Sign in 登录按钮，绿色，整行宽度",
+      "selector_hint": "input[type=submit][name=commit], button[type=submit], .btn-primary",
+      "type": "element"
+    },
+    {
+      "id": "signup-link",
+      "desc": "底部 Create an account 注册引导链接",
+      "selector_hint": "a[href*=signup]",
+      "type": "element"
+    },
+    {
+      "id": "login-flow",
+      "desc": "填入用户名密码后点击 Sign in，按钮可点击并触发表单提交校验",
+      "type": "behavior",
+      "steps": [
+        { "action": "fill", "target": "username", "value": "octocat" },
+        { "action": "fill", "target": "password", "value": "Secret1234" },
+        { "action": "click", "target": "submit-button" }
+      ]
+    },
+    {
+      "id": "empty-validation",
+      "desc": "不填任何内容直接点击登录，应有必填校验反馈（HTML5 required 或自定义提示）",
+      "type": "behavior",
+      "steps": [
+        { "action": "click", "target": "submit-button" },
+        { "action": "expect_visible", "target": "username" }
+      ]
+    }
+  ],
+  "masks": [],
+  "notes": "表单交互型。复刻 GitHub 登录页的用户名/密码输入与 Sign in 按钮交互，含必填校验。布局为居中卡片 + 顶部 Octocat logo。"
+}
