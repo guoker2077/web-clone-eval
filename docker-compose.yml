@@ -38,6 +38,7 @@ x-common: &common
 
 services:
   # ① CLI 工具镜像（单站点闭环 / 合成 scope / 预览静态产物）
+  #    不开 SSRF_GUARD：CLI 由开发者自己驱动，可复刻 http://localhost 等自有页。
   pipeline:
     <<: *common
     working_dir: /app/pipeline
@@ -48,6 +49,10 @@ services:
   web:
     <<: *common
     working_dir: /app
+    # 面向陌生人：开启 SSRF 防御（拦内网/云元数据/保留段 IP）
+    environment:
+      JOBS_DB: /app/data/jobs.db
+      SSRF_GUARD: "1"
     command: >
       uvicorn server.app:app --host 0.0.0.0 --port 8000
     ports:
@@ -57,6 +62,10 @@ services:
   worker:
     <<: *common
     working_dir: /app
+    # worker 抓取任意用户 URL，同样必须开 SSRF 防御
+    environment:
+      JOBS_DB: /app/data/jobs.db
+      SSRF_GUARD: "1"
     command: >
       python -m server.worker
     # worker 不对外暴露端口；通过 data 卷与 web 共享队列

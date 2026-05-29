@@ -20,6 +20,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 from config import DEFAULT_MODEL, get_client
+from ssrf_guard import protect_context
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -81,6 +82,7 @@ def probe_dom(url: str, wait_until: str = "networkidle",
         browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
         ctx = browser.new_context(user_agent=UA, locale="zh-CN",
                                   viewport={"width": 1280, "height": 800})
+        protect_context(ctx, url)  # SSRF 防护（仅 SSRF_GUARD 开启时生效）
         page = ctx.new_page()
         try:
             page.goto(url, wait_until=wait_until, timeout=60000)

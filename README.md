@@ -168,10 +168,34 @@ JOBS_DB="$PWD/server/jobs.db" .venv/bin/python -m server.worker
 关键接口：`POST /api/jobs`（提交）、`GET /api/jobs/{id}`（状态/分数）、
 `GET /api/jobs/{id}/logs?after_id=N`（增量进度）、`GET /preview/{site}/`（预览产物）。
 
-> 当前为**本地骨架**：单 worker 串行、SQLite 当队列、子进程当沙箱、仅校验 URL scheme。
-> 对外开放前需补三项加固：SSRF 防御（拦内网/元数据 IP、重定向重验）、
-> 每 job 沙箱容器（资源/网络限制）、限流与配额（防滥用与成本失控）。
+> 当前为**本地骨架**：单 worker 串行、SQLite 当队列、子进程当沙箱。
+> 已完成**第一项对外加固——SSRF 防御**（见下「SSRF 防御」）。
+> 仍待补两项：每 job 沙箱容器（资源/网络限制）、限流与配额（防滥用与成本失控）。
 > worker 调 runner 的子进程边界即为未来 `docker run` 沙箱的接入点。
+
+### SSRF 防御（拦内网 / 云元数据 / 重定向）
+
+云端要替**陌生人**用无头浏览器抓**任意 URL**——这是教科书级的 SSRF 风险：攻击者可提交
+`http://169.254.169.254/...`（偷云厂商 IAM 凭证）、`http://127.0.0.1:6379`（打内网 Redis）、
+`http://10.x / 192.168.x`（打内网主机）、`file:///etc/passwd`（越权读本地）。
+`pipeline/ssrf_guard.py` 提供纵深防御，**三个接入点**：
+
+1. **提交时**（`app.py`）——主闸门 `assert_url_allowed(url)`：scheme 白名单（仅 http/https）、
+   端口白名单（挡 6379/3306/22 等内网服务端口）、host 解析后逐 IP 判网段（拦
+   链路本地/私有/环回/保留段），明显非法直接 400。
+2. **抓取前**（`capture` / `probe_dom`）——`protect_context` 再解析一次 DNS 并复检，
+   并把已解析 IP 回传，**防 DNS rebinding**（提交与抓取之间域名重解析成内网）。
+3. **导航中**（Playwright route）——`guard_route` 拦截页面每一跳请求，**防 30x 重定向
+   到内网**或页面内请求内网资源；按 (scheme,host,port) 缓存判定，避免逐子资源重复解析。
+
+```bash
+# 开关：仅当 SSRF_GUARD 为真时启用。
+# 云端 web/worker 默认开（compose 已设 SSRF_GUARD=1）；
+# 本地 CLI（pipeline 服务）默认关，方便复刻 http://localhost:3000 等自有开发页。
+```
+
+> 与网络层（worker 私有子网 + 出口过滤）配合构成纵深防御：即便应用层被绕过，
+> 网络层仍兜底拦截。
 
 `.env` 支持两种鉴权方式（择一）：
 

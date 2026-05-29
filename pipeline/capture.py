@@ -13,6 +13,8 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
+from ssrf_guard import protect_context
+
 ROOT = Path(__file__).resolve().parent.parent
 
 # 反爬：用真实浏览器 UA
@@ -102,6 +104,7 @@ def capture(scope: dict) -> Path:
                 user_agent=UA,
                 locale="zh-CN",
             )
+            protect_context(ctx, scope["url"])  # SSRF 防护（仅 SSRF_GUARD 开启时生效）
             page = ctx.new_page()
             page.goto(scope["url"], wait_until=wait.get("until", "networkidle"), timeout=60000)
             if wait.get("extra_ms"):

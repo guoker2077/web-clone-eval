@@ -26,8 +26,10 @@ from pydantic import BaseModel, Field
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "pipeline"))
 
 from server import jobstore  # noqa: E402
+from ssrf_guard import SSRFError, assert_url_allowed, guard_enabled  # noqa: E402
 
 OUTPUT = ROOT / "output"
 REPORTS = ROOT / "reports"
@@ -51,9 +53,14 @@ class SubmitReq(BaseModel):
 @app.post("/api/jobs")
 def submit(req: SubmitReq) -> JSONResponse:
     url = req.url.strip()
-    # 入口最小校验：scheme 白名单。真正的 SSRF 防御（IP 段拦截/重定向重验）
-    # 在第二步加固时补到这里——本步只跑通异步链路。
-    if not (url.startswith("http://") or url.startswith("https://")):
+    # 入口校验。基础：scheme 白名单。开启 SSRF_GUARD 后（云端 web 服务默认开），
+    # 进一步解析 DNS 并拦截内网/云元数据/保留段地址——接入公网前的硬门槛。
+    if guard_enabled():
+        try:
+            assert_url_allowed(url)
+        except SSRFError as e:
+            raise HTTPException(400, str(e))
+    elif not (url.startswith("http://") or url.startswith("https://")):
         raise HTTPException(400, "url 必须以 http:// 或 https:// 开头")
     job = jobstore.create_job(url, req.scope_text.strip(),
                               max_rounds=req.max_rounds, threshold=req.threshold)
