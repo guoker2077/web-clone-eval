@@ -40,9 +40,15 @@ def build_clone(site_dir: Path) -> Path:
     """
     npm = "npm"
     print(f"[eval] npm install @ {site_dir}")
-    subprocess.run([npm, "install", "--no-audit", "--no-fund",
-                    "--registry=https://registry.npmmirror.com"],
-                   cwd=site_dir, check=True, capture_output=True, text=True, timeout=600)
+    inst = subprocess.run([npm, "install", "--no-audit", "--no-fund",
+                           "--registry=https://registry.npmmirror.com"],
+                          cwd=site_dir, capture_output=True, text=True, timeout=600)
+    if inst.returncode != 0:
+        # 把 npm 的真实报错带出来，否则上层只看到「exit status 1」无从排查
+        raise RuntimeError(
+            "npm install 失败 (exit "
+            f"{inst.returncode}):\n{(inst.stderr or inst.stdout)[-1000:]}"
+        )
     print("[eval] npm run build")
     r = subprocess.run([npm, "run", "build"], cwd=site_dir,
                        capture_output=True, text=True, timeout=300)

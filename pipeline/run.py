@@ -149,16 +149,31 @@ def run(site_id: str, max_rounds: int, threshold: float, skip_capture: bool,
         json.dumps({"history": history, "best_round": best_round,
                     "best_score": best["score"] if best else None},
                    ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\n[run] 完成。最佳分数: {best['score'] if best else 'N/A'} (round{best_round})")
-    return {"best_score": best["score"] if best else None,
-            "best_round": best_round, "history": history}
+
+    if best is None:
+        # 所有轮都失败：没有任何可用产物。明确报失败，别打印「完成」误导。
+        errs = [h.get("error") for h in history if h.get("error")]
+        last_err = errs[-1] if errs else "未知错误"
+        msg = (f"全部 {max_rounds} 轮均失败，无可用产物。最后一轮错误：{last_err}")
+        print(f"\n[run] ❌ {msg}")
+        progress("failed", msg)
+        return {"best_score": None, "best_round": None,
+                "history": history, "failed": True}
+
+    print(f"\n[run] 完成。最佳分数: {best['score']} (round{best_round})")
+    return {"best_score": best["score"], "best_round": best_round,
+            "history": history, "failed": False}
 
 
 if __name__ == "__main__":
+    import sys
+
     ap = argparse.ArgumentParser()
     ap.add_argument("site_id")
     ap.add_argument("--max-rounds", type=int, default=3)
     ap.add_argument("--threshold", type=float, default=85.0)
     ap.add_argument("--skip-capture", action="store_true")
     args = ap.parse_args()
-    run(args.site_id, args.max_rounds, args.threshold, args.skip_capture)
+    summary = run(args.site_id, args.max_rounds, args.threshold, args.skip_capture)
+    # 全失败无可用产物时以非 0 退出，避免在 CLI/CI 里被误判为成功
+    sys.exit(1 if summary.get("failed") else 0)

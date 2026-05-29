@@ -50,8 +50,14 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # 5) 非 root 运行用户（缩小被攻破影响面；根治产物被 root 占有的问题）。
 #    入口脚本以 root 起、修正卷属主后 setpriv 降到该用户；故镜像默认仍 root 启动，
 #    由 entrypoint 完成降权。app 用户家目录给 npm/playwright 缓存用。
+#    预建 .npm/.cache 并置 HOME：npm 默认用 $HOME/.npm，若 HOME 缺失/不可写会
+#    EACCES（setpriv 不重置 HOME，故这里与 entrypoint 双保险）。
 RUN groupadd -g 1000 app && useradd -u 1000 -g 1000 -m -s /bin/bash app \
-    && chown -R app:app /app
+    && mkdir -p /home/app/.npm /home/app/.cache \
+    && chown -R app:app /app /home/app
+
+ENV HOME=/home/app \
+    NPM_CONFIG_CACHE=/home/app/.npm
 
 WORKDIR /app/pipeline
 
