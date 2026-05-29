@@ -1,31 +1,62 @@
 # web-clone-eval 一体化流水线运行环境
 #
-# 用法（在工程根目录）：
+# 三种用法：
+#   ① CLI 工具（单站点闭环、合成 scope、预览）—— pipeline 服务
+#   ② 云端异步服务（提交→后台跑→轮询→预览）—— web + worker 服务
+#
+# CLI 用法（在工程根目录）：
 #   构建镜像：     docker compose build
 #   跑闭环：       docker compose run --rm pipeline python run.py baidu --max-rounds 2
 #   合成 scope：   docker compose run --rm pipeline python synthesize_scope.py <url> "<范围>"
-#   预览复刻产物： docker compose run --rm --service-ports pipeline \
-#                    python -m http.server 8080 --directory /app/output/baidu/dist
+#
+# 云端异步用法：
+#   起服务：       docker compose up web worker
+#   打开 UI：      http://localhost:8000  （填网址+复刻范围，提交后自动跑，完成可一键预览）
 #
 # 密钥通过 env_file 注入（.env 已被 .gitignore 与 .dockerignore 排除，绝不入镜像）。
-# 产物目录以卷挂载到宿主机，容器删除后结果仍在本地。
+# 产物目录与队列 DB 以卷挂载到宿主机，容器删除后结果仍在本地。
+
+x-common: &common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: web-clone-eval:latest
+  env_file:
+    - .env
+  volumes:
+    # 流水线产物落回宿主机，便于查看与提交
+    - ./output:/app/output
+    - ./reports:/app/reports
+    - ./prompts:/app/prompts
+    # scopes 双向挂载：宿主机新增/合成的 scope 立即对容器可见
+    - ./scopes:/app/scopes
+    # 队列 DB + worker 日志：web 与 worker 共享，故放独立 data 卷
+    - ./data:/app/data
+  environment:
+    # web 与 worker 必须指向同一个 SQLite 队列文件
+    JOBS_DB: /app/data/jobs.db
 
 services:
+  # ① CLI 工具镜像（单站点闭环 / 合成 scope / 预览静态产物）
   pipeline:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: web-clone-eval:latest
-    env_file:
-      - .env
-    volumes:
-      # 流水线产物落回宿主机，便于查看与提交
-      - ./output:/app/output
-      - ./reports:/app/reports
-      - ./prompts:/app/prompts
-      # scopes 双向挂载：宿主机新增/合成的 scope 立即对容器可见
-      - ./scopes:/app/scopes
-    # 预览复刻产物时用 --service-ports 暴露
-    ports:
-      - "8080:8080"
+    <<: *common
     working_dir: /app/pipeline
+    ports:
+      - "8080:8080"   # 预览复刻产物时用 --service-ports 暴露
+
+  # ② 云端 API + UI（无状态，提交任务、查询进度、预览产物）
+  web:
+    <<: *common
+    working_dir: /app
+    command: >
+      uvicorn server.app:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+
+  # ② 云端 worker（认领队列任务，以子进程跑 runner 闭环）
+  worker:
+    <<: *common
+    working_dir: /app
+    command: >
+      python -m server.worker
+    # worker 不对外暴露端口；通过 data 卷与 web 共享队列

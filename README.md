@@ -51,6 +51,12 @@ web-clone-eval/
 │  ├─ report.py           # 渲染 Markdown 报告
 │  ├─ run.py              # ④ 总控闭环
 │  └─ check_api.py        # API 连通性自测
+├─ server/                # 云端异步服务（提交→后台跑→轮询→预览）
+│  ├─ app.py              #   FastAPI：提交/查询/进度 API + 预览路由 + UI
+│  ├─ worker.py           #   worker：认领队列任务，子进程跑 runner
+│  ├─ runner.py           #   单 job 执行体（合成+闭环），进度回写
+│  ├─ jobstore.py         #   SQLite 任务库+队列（WAL+原子认领）
+│  └─ static/             #   最小交互界面（表单+轮询+一键跳转）
 ├─ scopes/                # 每个站点一份 scope.json（唯一人工输入）
 ├─ output/<site>/         # 复刻产物（独立可运行的 Vite 工程）
 │  └─ _capture/           #   原页抓取的截图/DOM/meta
@@ -121,7 +127,51 @@ docker compose run --rm --service-ports pipeline \
 > 任何能访问 Docker Hub 的环境都能构建。`evaluate` 阶段构建复刻产物需要 npm/npx，
 > 已一并装入。产物目录与 `scopes/` 以卷挂载，容器删除后结果仍在本地。
 
+## 云端异步服务（Web UI：提交 → 后台跑 → 一键预览）
 
+除 CLI 外，本项目提供一套**异步任务服务**：用户在网页上只填「网址 + 自然语言范围」，
+提交后立即拿到任务、后台自动跑完整闭环（合成 scope → 复刻 → 评估 → 精修），
+页面实时显示进度，完成后一键跳转预览复刻页与评估报告。这是云端托管的可运行雏形。
+
+```bash
+# 起 API + worker（共享 ./data 下的队列 DB）
+docker compose up web worker
+# 浏览器打开 http://localhost:8000 ，填网址+复刻范围，提交即可
+```
+
+也可本地直接跑（不经 Docker）：
+
+```bash
+cd web-clone-eval
+# 终端 1：API + UI
+JOBS_DB="$PWD/server/jobs.db" .venv/bin/python -m uvicorn server.app:app --port 8000
+# 终端 2：worker（认领队列任务）
+JOBS_DB="$PWD/server/jobs.db" .venv/bin/python -m server.worker
+```
+
+架构（提交与执行解耦，为云端弹性伸缩铺路）：
+
+```
+浏览器 UI ──POST /api/jobs──▶ FastAPI(web, 无状态)
+                                  │ 入队
+                                  ▼
+                          SQLite 队列(./data/jobs.db)   ← 上云换 Redis+Postgres
+                                  │ 原子认领
+                                  ▼
+                          worker ──子进程──▶ runner(合成+闭环)
+                                  │ 进度/分数回写            ↑ 上云换 docker run 沙箱
+                                  ▼
+                       web 轮询 /api/jobs/{id}/logs → UI 实时进度
+                       完成后 /preview/{site} 预览、/report/{site} 看报告
+```
+
+关键接口：`POST /api/jobs`（提交）、`GET /api/jobs/{id}`（状态/分数）、
+`GET /api/jobs/{id}/logs?after_id=N`（增量进度）、`GET /preview/{site}/`（预览产物）。
+
+> 当前为**本地骨架**：单 worker 串行、SQLite 当队列、子进程当沙箱、仅校验 URL scheme。
+> 对外开放前需补三项加固：SSRF 防御（拦内网/元数据 IP、重定向重验）、
+> 每 job 沙箱容器（资源/网络限制）、限流与配额（防滥用与成本失控）。
+> worker 调 runner 的子进程边界即为未来 `docker run` 沙箱的接入点。
 
 `.env` 支持两种鉴权方式（择一）：
 

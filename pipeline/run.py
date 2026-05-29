@@ -11,12 +11,20 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from typing import Callable
 
 from capture import capture
 from evaluate import evaluate
 from generate import generate
 
 ROOT = Path(__file__).resolve().parent.parent
+
+# 进度回调签名：(stage: str, message: str) -> None。默认 no-op，CLI 路径不受影响。
+ProgressFn = Callable[[str, str], None]
+
+
+def _noop(stage: str, message: str) -> None:  # noqa: ARG001
+    pass
 
 
 def build_feedback(result: dict) -> str:
@@ -81,11 +89,13 @@ def _restore_src(out: Path, src: Path) -> None:
             shutil.copy2(child, out / child.name)
 
 
-def run(site_id: str, max_rounds: int, threshold: float, skip_capture: bool) -> None:
+def run(site_id: str, max_rounds: int, threshold: float, skip_capture: bool,
+        progress: ProgressFn = _noop) -> dict:
     scope = json.loads((ROOT / "scopes" / f"{site_id}.json").read_text(encoding="utf-8"))
     out = ROOT / "output" / site_id
 
     if not skip_capture:
+        progress("capturing", "抓取原页（多视口截图 + DOM + 配色）")
         capture(scope)
 
     feedback: str | None = None
@@ -96,10 +106,13 @@ def run(site_id: str, max_rounds: int, threshold: float, skip_capture: bool) -> 
     for rnd in range(max_rounds):
         print(f"\n===== Round {rnd} =====")
         try:
+            progress(f"generating", f"第 {rnd} 轮：Claude 生成复刻工程")
             generate(scope, feedback=feedback, round_no=rnd)
+            progress(f"evaluating", f"第 {rnd} 轮：构建 + 截图 + 打分")
             result = evaluate(scope, use_llm=False)
         except Exception as e:  # noqa: BLE001
             print(f"[run] 第 {rnd} 轮失败: {e}")
+            progress(f"refining", f"第 {rnd} 轮失败，将回灌反馈重试: {str(e)[:120]}")
             feedback = (f"上一轮生成/构建/运行失败：{str(e)[:300]}。"
                         f"请严格按 ===FILE: 路径=== 格式输出完整工程，确保能 npm build 并正常运行。")
             history.append({"round": rnd, "error": str(e)[:300]})
@@ -109,12 +122,14 @@ def run(site_id: str, max_rounds: int, threshold: float, skip_capture: bool) -> 
         _snapshot_src(out, rounds_dir / f"round{rnd}")
         history.append({"round": rnd, "score": result["score"],
                         "dimensions": result["dimensions"]})
+        progress("refining", f"第 {rnd} 轮得分 {result['score']}/100")
         if best is None or result["score"] > best["score"]:
             best = result
             best_round = rnd
 
         if result["score"] >= threshold:
             print(f"[run] 达标 ({result['score']} >= {threshold})，停止精修。")
+            progress("refining", f"达标（{result['score']} ≥ {threshold}），停止精修")
             break
         feedback = build_feedback(result)
 
@@ -122,6 +137,7 @@ def run(site_id: str, max_rounds: int, threshold: float, skip_capture: bool) -> 
     if best_round is not None:
         _restore_src(out, rounds_dir / f"round{best_round}")
         from report import render
+        progress("evaluating", f"以最佳轮 round{best_round} 重算并生成报告")
         evaluate(scope)   # 用最佳产物重算，保证 eval.json/截图与产物一致
         render(site_id)
         print(f"[run] 已恢复最佳轮 round{best_round} 为最终产物。")
@@ -134,6 +150,8 @@ def run(site_id: str, max_rounds: int, threshold: float, skip_capture: bool) -> 
                     "best_score": best["score"] if best else None},
                    ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\n[run] 完成。最佳分数: {best['score'] if best else 'N/A'} (round{best_round})")
+    return {"best_score": best["score"] if best else None,
+            "best_round": best_round, "history": history}
 
 
 if __name__ == "__main__":

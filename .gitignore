@@ -24,6 +24,11 @@ output/**/node_modules/
 output/**/.rounds/
 reports/**/*.tmp.png
 
+# 服务端本地状态（队列 DB、worker 日志、数据卷）
+server/jobs.db*
+server/worker_logs/
+data/
+
 # OS / IDE
 .DS_Store
 .idea/

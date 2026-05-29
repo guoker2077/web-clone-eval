@@ -38,6 +38,7 @@ RUN playwright install --with-deps chromium
 # 4) 流水线源码与 scopes（产物目录运行时由卷挂载/生成，已在 .dockerignore 排除）
 COPY pipeline/ ./pipeline/
 COPY scopes/ ./scopes/
+COPY server/ ./server/
 
 WORKDIR /app/pipeline
 
