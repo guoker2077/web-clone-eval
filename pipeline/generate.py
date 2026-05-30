@@ -19,7 +19,11 @@ FILE_RE = re.compile(r"^===FILE:\s*(.+?)\s*===\s*$", re.MULTILINE)
 
 
 def _img_block(path: Path) -> dict:
-    data = base64.standard_b64encode(path.read_bytes()).decode()
+    """把截图编码为 API 图像块；超大/超长图先裁剪+缩放（见 metrics_visual.api_image_bytes），
+    避免长内容页整页截图（可达上万像素）触发上游网关 502。"""
+    from metrics_visual import api_image_bytes
+
+    data = base64.standard_b64encode(api_image_bytes(str(path))).decode()
     return {
         "type": "image",
         "source": {"type": "base64", "media_type": "image/png", "data": data},

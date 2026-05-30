@@ -69,7 +69,11 @@ def _build_rubric(modules: list[str] | None) -> str:
 
 
 def _img_block(path: Path, label: str) -> list:
-    data = base64.standard_b64encode(path.read_bytes()).decode()
+    # 超大/超长图先裁剪+缩放（见 metrics_visual.api_image_bytes），避免长内容页
+    # 整页截图触发视觉 API 网关 502。
+    from metrics_visual import api_image_bytes
+
+    data = base64.standard_b64encode(api_image_bytes(str(path))).decode()
     return [
         {"type": "text", "text": label},
         {"type": "image",

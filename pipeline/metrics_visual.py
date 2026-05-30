@@ -9,11 +9,43 @@
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import cv2
 import imagehash
 import numpy as np
 from PIL import Image
 from skimage.metrics import structural_similarity as ssim
+
+
+def api_image_bytes(path: str, max_side: int = 1568,
+                    max_aspect: float = 4.0) -> bytes:
+    """把截图处理成适合发给视觉 API 的 PNG 字节：超长先裁顶部、超大再等比缩放。
+
+    长内容页整页截图可高达上万像素（如 1280x22016），任一边过大会让上游网关 502。
+    两步：① 长宽比 > max_aspect 时裁到顶部 width*max_aspect（结构由 DOM 提供，
+    截图只传达视觉风格，顶部最具代表性）；② 最长边压到 max_side 以内。无需处理时
+    原样返回字节。供 generate / metrics_llm 共用，保证两处行为一致。
+    """
+    from io import BytesIO
+
+    img = Image.open(path).convert("RGB")
+    w, h = img.size
+    changed = False
+    if h > w * max_aspect:
+        img = img.crop((0, 0, w, int(w * max_aspect)))
+        w, h = img.size
+        changed = True
+    if max(w, h) > max_side:
+        scale = max_side / max(w, h)
+        img = img.resize((max(1, int(w * scale)), max(1, int(h * scale))),
+                         Image.LANCZOS)
+        changed = True
+    if not changed:
+        return Path(path).read_bytes()
+    buf = BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
 
 
 def _load_rgb(path: str, size: tuple[int, int] | None = None) -> np.ndarray:
