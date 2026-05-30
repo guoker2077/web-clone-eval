@@ -27,12 +27,13 @@
    ▼
    Build      npm install && npm run build → 起静态服务
    ▼
-③ Evaluate   原页 vs 复刻页 → 视觉(SSIM/像素/pHash) + 功能(覆盖率/断言) + 交互(状态/流程)
+③ Evaluate   原页 vs 复刻页 → 视觉(逐模块裁剪 SSIM/像素/pHash) + 功能(覆盖率/断言)
+             + 交互(状态/流程) + LLM 交叉验证（可置信）
    ▼
 ④ Refine     分数 < 阈值 → 差异点+失败断言回灌 Claude → 回到② (限 N 轮，全自动)
    │
    ▼ 达标
-  报告 (report.md + eval.json + 截图)
+  报告 (report.md + eval.json + 截图) → 打包交付产物 deliverables/<site>
 ```
 
 ## 目录结构
@@ -61,8 +62,10 @@ web-clone-eval/
 ├─ scopes/                # 每个站点一份 scope.json（唯一人工输入）
 ├─ output/<site>/         # 复刻产物（独立可运行的 Vite 工程）
 │  └─ _capture/           #   原页抓取的截图/DOM/meta
+├─ deliverables/<site>/   # 交付产物：source/（可维护源码）+ dist/（独立运行）+ README
 ├─ reports/<site>/        # 评估报告 + 复刻页截图 + 历史
 ├─ prompts/<site>/        # 留存的 prompt 与 Claude 响应（体现 AI 使用过程）
+├─ run_logs/              # 运行日志 + EVIDENCE.md（可复现性与量化数据分析证据）
 ├─ requirements.txt
 ├─ Dockerfile             # 一体化运行镜像（Playwright+Node+中文字体，非 root）
 ├─ docker-entrypoint.sh   # 入口：修正卷属主后降权到非 root 运行
@@ -318,7 +321,8 @@ python synthesize_scope.py https://github.com/login \
 ② Claude 把自然语言范围 + 真实元素清单展开成结构化 features；
 ③ **确定性校验**——强制 `action` 落在白名单、behavior 的 `target` 必须引用已声明的 element、
 element 必须有真实 `selector_hint`，校验不过会回灌让模型自修。
-因此合成产物可直接驱动复刻与评估（实测 GitHub 登录页合成版闭环得分 94.3，与手写版持平）。
+因此合成产物可直接驱动复刻与评估（实测 GitHub 登录页：云端 API 自动合成版闭环
+得分 92.8，与手写 scope 的 CLI 版 95.1 基本持平，证明自动化链路可独立复现结果）。
 
 > 站点 `id` 默认从 URL 推断（可用 `--id` 指定）。selector 取自**原页 DOM**，
 > 对结构复杂或重度动态渲染的页面合成质量会下降，此时建议改用方式 B 手写精确控制。
@@ -372,19 +376,44 @@ element 必须有真实 `selector_hint`，校验不过会回灌让模型自修�
 
 **总分** = 视觉×0.4 + 功能×0.4 + 交互×0.2（满分 100）。权重定义在 `evaluate.py` 的 `WEIGHTS`，透明可调。所有截图统一缩放后比较，多视口取均值。
 
+> **范围对齐评分**：视觉指标按 scope 声明的模块**逐块裁剪比对**（原页 bbox 来自
+> capture，复刻页来自 `data-testid`），不拿整页比——避免复刻页因缺少范围外内容
+> （壁纸/资讯流/页脚）被冤枉扣分（生成目标≠评估目标）。整页指标仅作参考留档。
+> LLM 辅助评分同样只评声明模块。
+
+> **可置信设计**：① 确定性指标（SSIM 等）同输入必得同输出、bit-for-bit 可复现，
+> 与非确定的 LLM 分明确分离；② 所有比率附原始计数（如断言 5/5）；③ **交叉验证**
+> ——确定性视觉分与 LLM 视觉分两种独立方法相互印证，差距≤15 判「一致」、否则
+> 「存疑」提示复核。报告中并列展示（详见 [EVIDENCE.md](run_logs/EVIDENCE.md)）。
+
 > **LLM 辅助评分（加分项）**：除上述确定性指标外，额外让 Claude 视觉模型同时看原页与复刻页，按 rubric 打分（`metrics_llm.py`）。因 LLM 评分非确定性，**不计入主总分**，仅作辅助信号与确定性指标交叉验证，在报告中并列展示。实测它对纯视觉还原度更敏感，能补充 SSIM 之外的人眼直觉判断。
 
 ## 复刻结果
 
-3 类页面（1 内容展示型 + 2 表单交互型），均跑完闭环精修，分数见各报告：
+4 个不同类型页面（1 内容展示型 + 3 表单交互型：登录×1、搜索×2），均跑完闭环精修。
+完整可引用的证据与数据分析见 [run_logs/EVIDENCE.md](run_logs/EVIDENCE.md)。
 
-| 序号 | 类型 | 原始网址 | 复刻需求 | 前端代码 | 综合得分 | 视觉/功能/交互 | LLM辅助 | 报告 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 内容展示 | https://www.baidu.com | 搜索框/按钮/结果列表/翻页 | [output/baidu](output/baidu) | **77.5** | 75.3 / 83.3 / 70.0 | 桌面84 / 移动70 | [report](reports/baidu/report.md) |
-| 2 | 表单交互 | 微信支付登录页 | 用户名/密码/验证码/登录 | [output/wxpay-login](output/wxpay-login) | **77.9** | 44.7 / 100 / 100 | 桌面62 | [report](reports/wxpay-login/report.md) |
-| 3 | 表单交互 | https://github.com/login | 用户名/密码/登录交互/必填校验 | [output/github-login](output/github-login) | **93.6** | 88.9 / 100 / 90.0 | 桌面92 | [report](reports/github-login/report.md) |
+| 序号 | 类型 | 原始网址 | 复刻需求 | 交付产物 | 综合得分 | 视觉/功能/交互 | LLM辅助 | 交叉验证 | 报告 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 登录表单 | https://github.com/login | 用户名/密码/登录交互/必填校验 | [deliverables/github-login](deliverables/github-login) | **95.1** | 92.7 / 100 / 90.0 | 95 | 差2.3 ✅一致 | [report](reports/github-login/report.md) |
+| 2 | 内容展示 | MDN `<a>` 文档页 | 导航/面包屑/正文/代码块/右侧大纲 | [deliverables/mdn-doc](deliverables/mdn-doc) | **80.2** | 50.6 / 100 / 100 | 84 | 差33.4 ⚠️存疑 | [report](reports/mdn-doc/report.md) |
+| 3 | 搜索表单 | https://www.baidu.com | 搜索框/按钮/结果列表/翻页 | [deliverables/baidu](deliverables/baidu) | **79.2** | 79.6 / 83.3 / 70.0 | 82 | 差0.1 ✅一致 | [report](reports/baidu/report.md) |
+| 4 | 搜索表单 | https://www.bing.com | 搜索框/按钮/结果列表/翻页 | [deliverables/bing](deliverables/bing) | **67.5** | 58.6 / 75.0 / 70.0 | 79 | 差20.4 ⚠️存疑 | [report](reports/bing/report.md) |
 
-> 启动任一复刻产物：`cd output/<site> && npm install && npm run dev`。
+每站交付物含三部分：`source/`（可长期维护的 React+TS+Vite 源码）、`dist/`（已构建、
+零依赖、可独立运行的静态产物）、`README.md`（运行说明 + 评分摘要 + mock 数据声明）。
+
+```bash
+# 直接运行交付产物（无需 Node，任意静态服务器）
+cd deliverables/<site>/dist && python3 -m http.server 8080   # 浏览器开 http://localhost:8080
+# 或从源码重建
+cd deliverables/<site>/source && npm install && npm run dev
+```
+
+> **关于「交叉验证」列**：确定性视觉分（SSIM 等，可复现）与 LLM 视觉分（独立视角）
+> 的差距。二者接近（≤15）判「一致」，是评分可信的强证据；差距大判「存疑」，提示
+> 人工复核。GitHub/百度两法差距仅 2.3/0.1，必应/MDN 标存疑也属正确——指标能如实
+> 暴露分歧而非一律打高分，正是「可置信」的体现（详见 EVIDENCE.md §3.2）。
 
 ## 关于 AI 工具使用
 
