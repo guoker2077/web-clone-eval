@@ -1,0 +1,76 @@
+.search-box {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.search-box__field {
+  position: relative;
+  border: 1px solid #4e6ef2;
+  border-radius: 12px;
+  padding: 16px 18px 56px;
+  box-shadow: 0 2px 10px rgba(78, 110, 242, 0.08);
+  background: #fff;
+}
+
+.search-box__input {
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  font-size: 16px;
+  line-height: 22px;
+  color: #222;
+  font-family: 'PingFang SC', Arial, sans-serif;
+  background: transparent;
+  min-height: 22px;
+  overflow: hidden;
+}
+
+.search-box__input::placeholder {
+  color: #9195a3;
+}
+
+.search-box__tools {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-box__tool {
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.search-box__tool:hover {
+  background: #f1f3ff;
+}
+
+.search-box__submit {
+  margin-left: 8px;
+  height: 40px;
+  padding: 0 26px;
+  border: none;
+  border-radius: 10px;
+  background: #4e6ef2;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  font-family: 'PingFang SC', Arial, sans-serif;
+  transition: background 0.15s;
+}
+
+.search-box__submit:hover {
+  background: #4156d6;
+}

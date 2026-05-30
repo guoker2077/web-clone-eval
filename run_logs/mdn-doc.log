@@ -1,0 +1,27 @@
+
+===== Round 0 =====
+[generate] round0 写入 19 个文件 -> /app/output/mdn-doc
+[eval] npm install @ /app/output/mdn-doc
+[eval] npm run build
+[eval] mdn-doc 总分 80.2 (视觉 50.6 / 功能 100.0 / 交互 100.0)
+
+===== Round 1 =====
+[generate] round1 写入 14 个文件 -> /app/output/mdn-doc
+[eval] npm install @ /app/output/mdn-doc
+[eval] npm run build
+[eval] mdn-doc 总分 77.9 (视觉 44.7 / 功能 100.0 / 交互 100.0)
+
+===== Round 2 =====
+[generate] round2 写入 21 个文件 -> /app/output/mdn-doc
+[eval] npm install @ /app/output/mdn-doc
+[eval] npm run build
+[eval] mdn-doc 总分 79.4 (视觉 48.6 / 功能 100.0 / 交互 100.0)
+[eval] npm install @ /app/output/mdn-doc
+[eval] npm run build
+[eval] LLM 视觉评分 @ desktop ...
+[eval] mdn-doc 总分 80.2 (视觉 50.6 / 功能 100.0 / 交互 100.0)
+[report] 生成 /app/reports/mdn-doc/report.md
+[run] 已恢复最佳轮 round0 为最终产物。
+
+[run] 完成。最佳分数: 80.2 (round0)
+[deliver] 已打包交付产物 → /app/deliverables/mdn-doc

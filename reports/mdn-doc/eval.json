@@ -1,0 +1,385 @@
+{
+  "site_id": "mdn-doc",
+  "score": 80.2,
+  "dimensions": {
+    "visual": 50.6,
+    "functional": 100.0,
+    "interaction": 100.0
+  },
+  "visual_detail": {
+    "desktop": {
+      "ssim": 0.5801,
+      "pixel_diff_ratio": 0.1212,
+      "phash_distance": 20
+    }
+  },
+  "scoped_visual_detail": {
+    "desktop": {
+      "modules": {
+        "skip-to-content": {
+          "present": false
+        },
+        "logo-home": {
+          "ssim": 0.3751,
+          "pixel_diff_ratio": 0.293,
+          "phash_distance": 30,
+          "present": true
+        },
+        "nav-blog": {
+          "ssim": 0.6277,
+          "pixel_diff_ratio": 0.1415,
+          "phash_distance": 12,
+          "present": true
+        },
+        "breadcrumb-web": {
+          "present": false
+        },
+        "breadcrumb-html": {
+          "present": false
+        },
+        "breadcrumb-reference": {
+          "present": false
+        },
+        "breadcrumb-elements": {
+          "present": false
+        },
+        "breadcrumb-anchor": {
+          "ssim": 0.8802,
+          "pixel_diff_ratio": 0.1329,
+          "phash_distance": 16,
+          "present": true
+        },
+        "toc-try-it": {
+          "ssim": 0.3592,
+          "pixel_diff_ratio": 0.1472,
+          "phash_distance": 42,
+          "present": true
+        },
+        "toc-attributes": {
+          "ssim": 0.4261,
+          "pixel_diff_ratio": 0.1762,
+          "phash_distance": 32,
+          "present": true
+        },
+        "toc-accessibility": {
+          "ssim": 0.4194,
+          "pixel_diff_ratio": 0.1837,
+          "phash_distance": 28,
+          "present": true
+        },
+        "toc-examples": {
+          "ssim": 0.4188,
+          "pixel_diff_ratio": 0.1731,
+          "phash_distance": 32,
+          "present": true
+        },
+        "toc-security-privacy": {
+          "ssim": 0.4249,
+          "pixel_diff_ratio": 0.1837,
+          "phash_distance": 22,
+          "present": true
+        },
+        "toc-technical-summary": {
+          "ssim": 0.4675,
+          "pixel_diff_ratio": 0.1746,
+          "phash_distance": 28,
+          "present": true
+        },
+        "toc-specifications": {
+          "ssim": 0.4277,
+          "pixel_diff_ratio": 0.1799,
+          "phash_distance": 26,
+          "present": true
+        },
+        "toc-browser-compatibility": {
+          "ssim": 0.4301,
+          "pixel_diff_ratio": 0.1231,
+          "phash_distance": 34,
+          "present": true
+        },
+        "toc-see-also": {
+          "ssim": 0.4447,
+          "pixel_diff_ratio": 0.157,
+          "phash_distance": 38,
+          "present": true
+        },
+        "content-global-attributes": {
+          "present": false
+        },
+        "content-attr-download": {
+          "ssim": 0.5297,
+          "pixel_diff_ratio": 0.3088,
+          "phash_distance": 12,
+          "present": true
+        },
+        "content-attr-hreflang": {
+          "ssim": 0.5436,
+          "pixel_diff_ratio": 0.2966,
+          "phash_distance": 8,
+          "present": true
+        }
+      },
+      "aggregate": {
+        "ssim": 0.4839,
+        "pixel_diff_ratio": 0.1908,
+        "phash_distance": 25.7
+      },
+      "present": 14,
+      "total": 20
+    }
+  },
+  "llm_visual": {
+    "desktop": {
+      "layout": 84,
+      "color": 86,
+      "typography": 85,
+      "components": 82,
+      "overall": 84,
+      "comment": "指定模块整体还原到位，导航、面包屑、右侧大纲与属性锚点结构清晰，仅顶部 Skip 链接缺失、主导航项与原页略有出入。",
+      "modules": [
+        {
+          "name": "顶部「Skip to main content」跳转链接",
+          "score": 30,
+          "note": "复刻页未见该跳转链接，原页左上角有"
+        },
+        {
+          "name": "顶部导航栏 MDN 站点 logo",
+          "score": 95,
+          "note": "mdn_ logo 位置与样式还原准确"
+        },
+        {
+          "name": "顶部导航栏「HTML」分类菜单按钮",
+          "score": 80,
+          "note": "存在且带下拉标识，但主导航整体菜单项与原页排列不同"
+        },
+        {
+          "name": "顶部导航栏「Learn」分类菜单按钮",
+          "score": 82,
+          "note": "保留 Learn 下拉按钮，位置略有差异"
+        },
+        {
+          "name": "顶部导航栏「Blog」链接",
+          "score": 88,
+          "note": "Blog 链接位置与样式基本一致"
+        },
+        {
+          "name": "面包屑导航「Web」链接",
+          "score": 92,
+          "note": "蓝色链接样式与位置还原好"
+        },
+        {
+          "name": "面包屑导航「HTML」链接",
+          "score": 92,
+          "note": "分隔与对齐准确"
+        },
+        {
+          "name": "面包屑导航「Reference」链接",
+          "score": 92,
+          "note": "层级清晰还原"
+        },
+        {
+          "name": "面包屑导航「Elements」链接",
+          "score": 92,
+          "note": "样式一致"
+        },
+        {
+          "name": "面包屑导航当前页「<a>」链接",
+          "score": 90,
+          "note": "当前页项还原，分隔符用斜杠略不同"
+        },
+        {
+          "name": "右侧 On this page 大纲「Try it」锚点",
+          "score": 90,
+          "note": "In this article 列表首项一致"
+        },
+        {
+          "name": "右侧大纲「Attributes」锚点",
+          "score": 90,
+          "note": "顺序与文字还原准确"
+        },
+        {
+          "name": "右侧大纲「Accessibility」锚点",
+          "score": 90,
+          "note": "位置与样式一致"
+        },
+        {
+          "name": "右侧大纲「Examples」锚点",
+          "score": 90,
+          "note": "还原到位"
+        },
+        {
+          "name": "右侧大纲「Security and privacy」锚点",
+          "score": 90,
+          "note": "文字与层级一致"
+        },
+        {
+          "name": "右侧大纲「Technical summary」锚点",
+          "score": 90,
+          "note": "还原准确"
+        },
+        {
+          "name": "右侧大纲「Specifications」锚点",
+          "score": 90,
+          "note": "顺序正确"
+        },
+        {
+          "name": "右侧大纲「Browser compatibility」锚点",
+          "score": 90,
+          "note": "文字一致"
+        },
+        {
+          "name": "右侧大纲「See also」锚点",
+          "score": 90,
+          "note": "末项还原准确"
+        },
+        {
+          "name": "正文中「global attributes」链接",
+          "score": 88,
+          "note": "蓝色链接位置与上下文一致"
+        },
+        {
+          "name": "Attributes 章节内「download」属性锚点链接",
+          "score": 85,
+          "note": "蓝色徽章样式锚点还原，但章节顺序与原页排列略有不同"
+        },
+        {
+          "name": "Attributes 章节内「hreflang」属性锚点链接",
+          "score": 85,
+          "note": "锚点徽章样式一致，位置接近"
+        }
+      ]
+    }
+  },
+  "coverage": {
+    "element_presence": 1.0,
+    "behavior_pass": 1.0,
+    "assert_pass": 1.0,
+    "detail": {
+      "el_ok": 22,
+      "el_total": 22,
+      "bh_ok": 4,
+      "bh_total": 4,
+      "assert_ok": 9,
+      "assert_total": 9
+    }
+  },
+  "behaviors": {
+    "features": {
+      "header-visible": {
+        "asserts": [
+          {
+            "step": "expect_visible(logo-home)",
+            "ok": true
+          },
+          {
+            "step": "expect_visible(nav-blog)",
+            "ok": true
+          }
+        ],
+        "passed": 2,
+        "total": 2,
+        "ok": true
+      },
+      "breadcrumb-check": {
+        "asserts": [
+          {
+            "step": "expect_visible(breadcrumb-web)",
+            "ok": true
+          },
+          {
+            "step": "expect_text(breadcrumb-anchor='<a>')",
+            "ok": true
+          }
+        ],
+        "passed": 2,
+        "total": 2,
+        "ok": true
+      },
+      "toc-jump-attributes": {
+        "asserts": [
+          {
+            "step": "click(toc-attributes)",
+            "ok": true
+          },
+          {
+            "step": "expect_visible(content-attr-download)",
+            "ok": true
+          },
+          {
+            "step": "expect_visible(content-attr-hreflang)",
+            "ok": true
+          }
+        ],
+        "passed": 3,
+        "total": 3,
+        "ok": true
+      },
+      "toc-content-check": {
+        "asserts": [
+          {
+            "step": "expect_text(toc-specifications='Specifications')",
+            "ok": true
+          },
+          {
+            "step": "expect_text(toc-see-also='See also')",
+            "ok": true
+          }
+        ],
+        "passed": 2,
+        "total": 2,
+        "ok": true
+      }
+    },
+    "elements": {
+      "skip-to-content": true,
+      "logo-home": true,
+      "nav-html-menu": true,
+      "nav-learn-menu": true,
+      "nav-blog": true,
+      "breadcrumb-web": true,
+      "breadcrumb-html": true,
+      "breadcrumb-reference": true,
+      "breadcrumb-elements": true,
+      "breadcrumb-anchor": true,
+      "toc-try-it": true,
+      "toc-attributes": true,
+      "toc-accessibility": true,
+      "toc-examples": true,
+      "toc-security-privacy": true,
+      "toc-technical-summary": true,
+      "toc-specifications": true,
+      "toc-browser-compatibility": true,
+      "toc-see-also": true,
+      "content-global-attributes": true,
+      "content-attr-download": true,
+      "content-attr-hreflang": true
+    },
+    "states": {}
+  },
+  "weights": {
+    "visual": 0.4,
+    "functional": 0.4,
+    "interaction": 0.2
+  },
+  "metric_nature": {
+    "deterministic": [
+      "ssim",
+      "pixel_diff_ratio",
+      "phash_distance",
+      "element_presence",
+      "behavior_pass",
+      "assert_pass"
+    ],
+    "non_deterministic": [
+      "llm_visual"
+    ],
+    "note": "确定性指标同输入必同输出、可复现；LLM 视觉分非确定，仅作辅助交叉验证。"
+  },
+  "cross_validation": {
+    "deterministic_visual": 50.6,
+    "llm_visual_avg": 84.0,
+    "delta": 33.4,
+    "agree": false,
+    "threshold": 15.0
+  }
+}

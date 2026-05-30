@@ -1,0 +1,50 @@
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: rgb(4, 76, 159);
+  color: #fff;
+  padding: 8px 16px;
+  z-index: 1000;
+}
+
+.skip-link:focus {
+  left: 8px;
+  top: 8px;
+}
+
+.page {
+  display: flex;
+  max-width: 1440px;
+  margin: 0 auto;
+  align-items: flex-start;
+}
+
+.main-area {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 24px;
+  padding: 24px 32px;
+}
+
+.article {
+  flex: 1;
+  min-width: 0;
+  max-width: 800px;
+}
+
+@media (max-width: 1100px) {
+  .toc {
+    display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .left-sidebar {
+    display: none;
+  }
+  .main-area {
+    padding: 16px;
+  }
+}

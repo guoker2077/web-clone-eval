@@ -1,0 +1,100 @@
+.sb_form {
+  display: flex;
+  align-items: center;
+  background: #fff;
+}
+
+/* ---- Home variant ---- */
+.sb_form.sb_home {
+  width: 500px;
+  max-width: 92vw;
+  height: 48px;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.sb_home .sb_input {
+  flex: 1;
+  height: 100%;
+  border: none;
+  outline: none;
+  padding: 0 18px;
+  font-size: 16px;
+  color: rgb(17, 17, 17);
+  background: transparent;
+}
+
+.sb_home .sb_mic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 100%;
+  color: #4c4c4c;
+  cursor: pointer;
+}
+
+.sb_home .sb_go {
+  width: 56px;
+  height: 100%;
+  border: none;
+  border-left: 1px solid #ececec;
+  background: #fff;
+  color: #4c4c4c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.sb_home .sb_go:hover {
+  color: #0067b8;
+}
+
+/* ---- Results variant ---- */
+.sb_form.sb_results {
+  width: 480px;
+  max-width: 60vw;
+  height: 40px;
+  border: 1px solid #ddd;
+  border-radius: 22px;
+  padding-left: 18px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.sb_results .sb_input {
+  flex: 1;
+  height: 100%;
+  border: none;
+  outline: none;
+  font-size: 15px;
+  color: rgb(17, 17, 17);
+  background: transparent;
+}
+
+.sb_results .sb_mic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 100%;
+  color: #4c4c4c;
+}
+
+.sb_results .sb_go {
+  width: 46px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: #0067b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 0 22px 22px 0;
+}
+
+.sb_results .sb_go:hover {
+  background: #f3f3f3;
+}

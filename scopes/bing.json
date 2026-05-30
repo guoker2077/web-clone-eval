@@ -1,0 +1,101 @@
+{
+  "name": "必应搜索",
+  "type": "form",
+  "features": [
+    {
+      "id": "search-input",
+      "desc": "搜索输入框",
+      "selector_hint": "#sb_form_q, input[name=q]",
+      "type": "element"
+    },
+    {
+      "id": "search-button",
+      "desc": "搜索提交按钮",
+      "selector_hint": "#sb_form_go, label[for=sb_form_go], #search_icon",
+      "type": "element"
+    },
+    {
+      "id": "search-results",
+      "desc": "搜索结果列表/结果文案区域",
+      "selector_hint": "#b_results, .b_algo, ol#b_results",
+      "type": "element"
+    },
+    {
+      "id": "next-page",
+      "desc": "结果列表下一页翻页按钮",
+      "selector_hint": "a.sb_pagN, a[title='下一页'], a[aria-label='下一页']",
+      "type": "element"
+    },
+    {
+      "id": "search-flow",
+      "desc": "在输入框填入关键词并点击搜索按钮，结果区域出现且包含关键词",
+      "type": "behavior",
+      "steps": [
+        {
+          "action": "fill",
+          "target": "search-input",
+          "value": "天气"
+        },
+        {
+          "action": "click",
+          "target": "search-button"
+        },
+        {
+          "action": "expect_visible",
+          "target": "search-results"
+        },
+        {
+          "action": "expect_text",
+          "target": "search-results",
+          "value": "天气"
+        }
+      ]
+    },
+    {
+      "id": "pagination-flow",
+      "desc": "搜索后点击下一页，结果区域刷新并依然可见",
+      "type": "behavior",
+      "steps": [
+        {
+          "action": "fill",
+          "target": "search-input",
+          "value": "天气"
+        },
+        {
+          "action": "click",
+          "target": "search-button"
+        },
+        {
+          "action": "expect_visible",
+          "target": "search-results"
+        },
+        {
+          "action": "click",
+          "target": "next-page"
+        },
+        {
+          "action": "expect_visible",
+          "target": "search-results"
+        }
+      ]
+    }
+  ],
+  "masks": [
+    "#bgImgProgLoad",
+    "#bgDiv"
+  ],
+  "notes": "核心复刻搜索输入框、搜索按钮、结果列表与翻页；输入框用真实选择器 #sb_form_q，按钮/结果/翻页采用必应结果页标准选择器作为候选。",
+  "id": "bing",
+  "url": "https://www.bing.com",
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1280,
+      "height": 800
+    }
+  ],
+  "wait": {
+    "until": "networkidle",
+    "extra_ms": 1500
+  }
+}

@@ -1,0 +1,43 @@
+.toc {
+  width: 220px;
+  flex-shrink: 0;
+}
+
+.toc-sticky {
+  position: sticky;
+  top: 80px;
+}
+
+.toc-title {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgb(81, 86, 93);
+  margin: 0 0 12px;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-left: 1px solid rgb(237, 238, 240);
+}
+
+.toc-list li {
+  margin: 0;
+}
+
+.toc-list a {
+  display: block;
+  padding: 6px 12px;
+  font-size: 14px;
+  color: rgb(81, 86, 93);
+  border-left: 2px solid transparent;
+  margin-left: -1px;
+}
+
+.toc-list a:hover {
+  color: rgb(4, 76, 159);
+  border-left-color: rgb(4, 76, 159);
+  text-decoration: none;
+}

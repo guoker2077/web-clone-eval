@@ -1,0 +1,26 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Segoe UI", Segoe, Tahoma, Arial, Verdana, sans-serif;
+  color: rgb(17, 17, 17);
+  background: #fff;
+}
+
+a {
+  text-decoration: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+}

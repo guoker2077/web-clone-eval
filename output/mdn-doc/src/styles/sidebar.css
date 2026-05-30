@@ -1,0 +1,91 @@
+.left-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  border-right: 1px solid rgb(237, 238, 240);
+  padding: 24px 16px;
+  position: sticky;
+  top: 56px;
+  align-self: flex-start;
+  max-height: calc(100vh - 56px);
+  overflow-y: auto;
+}
+
+.sidebar-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.filter-input {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 7px 12px;
+  border: 1px solid rgb(237, 238, 240);
+  border-radius: 6px;
+  width: 100%;
+}
+
+.filter-input:focus {
+  outline: 2px solid rgb(4, 76, 159);
+}
+
+.add-button {
+  font-family: inherit;
+  font-size: 14px;
+  text-align: left;
+  background: none;
+  border: none;
+  color: rgb(4, 76, 159);
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.add-button:hover {
+  text-decoration: underline;
+}
+
+.sidebar-heading {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgb(81, 86, 93);
+  margin: 0 0 8px;
+}
+
+.sidebar-group summary {
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 6px 0;
+  list-style-position: inside;
+}
+
+.sidebar-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0 0 0 8px;
+}
+
+.sidebar-list li {
+  margin: 0;
+}
+
+.sidebar-link {
+  display: block;
+  padding: 5px 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: rgb(4, 76, 159);
+  border-radius: 4px;
+}
+
+.sidebar-link:hover {
+  background: rgb(247, 247, 248);
+  text-decoration: none;
+}
+
+.sidebar-link.active {
+  background: rgb(236, 244, 254);
+  font-weight: 600;
+}

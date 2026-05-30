@@ -2,7 +2,7 @@
 {
   "name": "github-login-clone",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,9 +14,11 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "typescript": "^5.5.3",
-    "vite": "^5.4.0"
+    "vite": "^5.3.4"
   }
 }
 
@@ -82,7 +84,7 @@ export default defineConfig({
 ===FILE: src/main.tsx===
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import App from './App.tsx'
+import App from './App'
 import './index.css'
 
 createRoot(document.getElementById('root')!).render(
@@ -98,11 +100,10 @@ createRoot(document.getElementById('root')!).render(
   --color-canvas-default: rgb(255, 255, 255);
   --color-canvas-subtle: rgb(246, 248, 250);
   --color-accent-fg: rgb(9, 105, 218);
-  --color-success-fg: rgb(31, 136, 61);
   --color-border-default: #d1d9e0;
-  --font-stack: "Mona Sans VF", -apple-system, BlinkMacSystemFont, "Segoe UI",
-    "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji",
-    "Segoe UI Emoji";
+  --color-btn-primary-bg: rgb(31, 136, 61);
+  --color-btn-primary-hover: rgb(26, 119, 53);
+  --color-input-border: #d1d9e0;
 }
 
 * {
@@ -116,12 +117,14 @@ body {
 }
 
 body {
-  font-family: var(--font-stack);
+  font-family: "Mona Sans VF", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji";
+  font-size: 14px;
+  line-height: 1.5;
   color: var(--color-fg-default);
   background-color: var(--color-canvas-default);
-  font-size: 14px;
   -webkit-font-smoothing: antialiased;
-  line-height: 1.5;
 }
 
 a {
@@ -134,14 +137,13 @@ a:hover {
 }
 
 ===FILE: src/App.tsx===
-import { useState } from 'react'
 import LoginForm from './components/LoginForm'
 import Footer from './components/Footer'
 import './App.css'
 
 function App() {
   return (
-    <div className="page">
+    <div className="app">
       <main className="login-container">
         <LoginForm />
       </main>
@@ -153,7 +155,7 @@ function App() {
 export default App
 
 ===FILE: src/App.css===
-.page {
+.app {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -161,55 +163,39 @@ export default App
 }
 
 .login-container {
-  flex: 1;
-  width: 340px;
-  max-width: calc(100% - 32px);
+  flex: 1 0 auto;
+  width: 308px;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 40px 0 0;
+  padding: 40px 16px 0;
 }
 
 ===FILE: src/components/LoginForm.tsx===
-import { useState, FormEvent } from 'react'
-
-function GitHubMark() {
-  return (
-    <svg
-      height="48"
-      width="48"
-      viewBox="0 0 16 16"
-      aria-hidden="true"
-      className="github-mark"
-    >
-      <path
-        fill="currentColor"
-        d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.075-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"
-      />
-    </svg>
-  )
-}
+import { useState } from 'react'
+import GitHubMark from './GitHubMark'
+import './LoginForm.css'
 
 function LoginForm() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    // HTML5 required validation is handled by the form fields.
+    // On valid submission we simply mark the state as submitted (mock flow).
     setSubmitted(true)
-    // Mock login flow: validate non-empty fields then "submit"
-    if (username.trim() && password.trim()) {
-      window.alert(`Signing in as ${username}`)
-    }
   }
 
   return (
-    <div className="login">
-      <div className="login-logo">
+    <div className="login-form">
+      <div className="login-form__logo">
         <GitHubMark />
       </div>
-      <h1 className="login-title">Sign in to GitHub</h1>
 
-      <div className="auth-form">
+      <h1 className="login-form__title">Sign in to GitHub</h1>
+
+      <div className="login-form__box">
         <form onSubmit={handleSubmit} noValidate={false}>
           <div className="form-group">
             <label htmlFor="login_field">Username or email address</label>
@@ -218,27 +204,20 @@ function LoginForm() {
               name="login"
               type="text"
               className="form-control"
-              autoComplete="username"
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-              autoFocus
-              required
               data-testid="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              required
             />
           </div>
 
           <div className="form-group">
-            <div className="password-label-row">
+            <div className="form-group__password-header">
               <label htmlFor="password">Password</label>
-              <a
-                href="#"
-                className="forgot-link"
-                data-testid="forgot-password"
-                onClick={(e) => e.preventDefault()}
-              >
+              <a className="form-group__forgot" href="#forgot">
                 Forgot password?
               </a>
             </div>
@@ -247,92 +226,78 @@ function LoginForm() {
               name="password"
               type="password"
               className="form-control"
-              autoComplete="current-password"
-              required
               data-testid="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
             />
           </div>
 
           <input
             type="submit"
             name="commit"
-            className="btn btn-primary btn-block"
             value="Sign in"
+            className="btn btn-primary"
             data-testid="submit-button"
           />
         </form>
 
-        {submitted && (!username.trim() || !password.trim()) && (
-          <p className="validation-message" data-testid="validation-message">
-            Please fill in all required fields.
+        {submitted && (
+          <p className="login-form__status" role="status">
+            Signed in as {username} (mock).
           </p>
         )}
+      </div>
 
-        <div className="login-divider">
-          <span>or</span>
-        </div>
+      <div className="login-form__divider">
+        <span className="login-form__divider-line" />
+        <span className="login-form__divider-text">or</span>
+        <span className="login-form__divider-line" />
+      </div>
 
-        <button type="button" className="btn btn-block social-btn">
-          <svg
-            className="social-icon"
-            width="18"
-            height="18"
-            viewBox="0 0 18 18"
-            aria-hidden="true"
-          >
+      <button type="button" className="btn btn-social">
+        <span className="btn-social__icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 18 18">
             <path
               fill="#4285F4"
-              d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z"
+              d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"
             />
             <path
               fill="#34A853"
-              d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z"
+              d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"
             />
             <path
               fill="#FBBC05"
-              d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332Z"
+              d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"
             />
             <path
               fill="#EA4335"
-              d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58Z"
+              d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"
             />
           </svg>
-          Continue with Google
-        </button>
+        </span>
+        Continue with Google
+      </button>
 
-        <button type="button" className="btn btn-block social-btn">
-          <svg
-            className="social-icon"
-            width="16"
-            height="18"
-            viewBox="0 0 16 18"
-            aria-hidden="true"
-          >
-            <path
-              fill="#000000"
-              d="M13.07 9.5c-.02-1.97 1.61-2.92 1.68-2.97-.92-1.34-2.34-1.52-2.85-1.54-1.21-.12-2.37.71-2.99.71-.61 0-1.57-.69-2.58-.67-1.33.02-2.55.77-3.23 1.96-1.38 2.39-.35 5.93 1 7.87.66.95 1.44 2.02 2.47 1.98.99-.04 1.36-.64 2.56-.64 1.19 0 1.53.64 2.57.62 1.06-.02 1.74-.97 2.39-1.92.75-1.1 1.06-2.17 1.08-2.22-.02-.01-2.07-.79-2.09-3.15ZM11.1 3.21c.55-.66.92-1.59.82-2.51-.79.03-1.75.53-2.31 1.19-.5.58-.94 1.52-.82 2.42.88.07 1.78-.45 2.31-1.1Z"
-            />
+      <button type="button" className="btn btn-social">
+        <span className="btn-social__icon" aria-hidden="true">
+          <svg width="16" height="18" viewBox="0 0 14 16" fill="#000">
+            <path d="M11.182.008C11.148-.03 9.923.023 8.857 1.18c-1.066 1.156-.902 2.482-.878 2.516.024.034 1.52.087 2.475-1.258.955-1.345.762-2.391.728-2.43zm3.314 11.733c-.048-.096-2.325-1.234-2.113-3.422.212-2.189 1.675-2.789 1.698-2.854.023-.065-.597-.79-1.254-1.157a3.692 3.692 0 0 0-1.563-.434c-.108-.003-.483-.095-1.254.116-.508.139-1.653.589-1.968.607-.316.018-1.256-.522-2.267-.665-.647-.125-1.333.131-1.824.328-.49.196-1.422.754-2.074 2.237-.652 1.482-.311 3.83-.067 4.56.244.729.625 1.924 1.273 2.796.576.984 1.34 1.667 1.659 1.899.319.232 1.219.386 1.843.067.502-.308 1.408-.485 1.766-.472.357.013 1.061.154 1.782.539.571.197 1.111.115 1.652-.105.541-.221 1.324-1.059 2.238-2.758.347-.79.505-1.217.473-1.282z" />
           </svg>
-          Continue with Apple
-        </button>
+        </span>
+        Continue with Apple
+      </button>
 
-        <div className="create-account">
-          New to GitHub?{' '}
-          <a
-            href="https://github.com/signup"
-            data-testid="signup-link"
-          >
-            Create an account
-          </a>
-        </div>
+      <div className="login-form__signup">
+        New to GitHub?{' '}
+        <a href="https://github.com/signup" data-testid="signup-link">
+          Create an account
+        </a>
+      </div>
 
-        <div className="passkey-row">
-          <a href="#" className="passkey-link" onClick={(e) => e.preventDefault()}>
-            Sign in with a passkey
-          </a>
-        </div>
+      <div className="login-form__passkey">
+        <a href="#passkey">Sign in with a passkey</a>
       </div>
     </div>
   )
@@ -341,68 +306,36 @@ function LoginForm() {
 export default LoginForm
 
 ===FILE: src/components/LoginForm.css===
-/* styles live in App.css scope via index import; kept for clarity */
-
-===FILE: src/components/Footer.tsx===
-function Footer() {
-  const links = [
-    { label: 'Terms', href: '#' },
-    { label: 'Privacy', href: '#' },
-    { label: 'Docs', href: '#' },
-    { label: 'Contact GitHub Support', href: '#' },
-    { label: 'Manage cookies', href: '#' },
-    { label: 'Do not share my personal information', href: '#' },
-  ]
-
-  return (
-    <footer className="site-footer">
-      <ul className="footer-links">
-        {links.map((link) => (
-          <li key={link.label}>
-            <a href={link.href} onClick={(e) => e.preventDefault()}>
-              {link.label}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </footer>
-  )
-}
-
-export default Footer
-
-===FILE: src/components/styles.css===
-.login {
+.login-form {
   display: flex;
   flex-direction: column;
-  align-items: center;
 }
 
-.login-logo {
-  color: var(--color-fg-default);
+.login-form__logo {
+  display: flex;
+  justify-content: center;
   margin-bottom: 16px;
 }
 
-.github-mark {
-  display: block;
+.login-form__logo svg {
+  fill: var(--color-fg-default);
 }
 
-.login-title {
-  font-size: 24px;
+.login-form__title {
+  font-size: 20px;
   font-weight: 300;
-  letter-spacing: -0.5px;
+  line-height: 1.25;
   text-align: center;
   margin: 0 0 16px;
-  color: var(--color-fg-default);
+  letter-spacing: -0.5px;
 }
 
-.auth-form {
-  width: 100%;
+.login-form__box {
+  margin-top: 4px;
 }
 
 .form-group {
   margin-bottom: 16px;
-  text-align: left;
 }
 
 .form-group label {
@@ -413,30 +346,30 @@ export default Footer
   color: var(--color-fg-default);
 }
 
-.password-label-row {
+.form-group__password-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.form-group__password-header label {
   margin-bottom: 8px;
 }
 
-.password-label-row label {
-  margin-bottom: 0;
-}
-
-.forgot-link {
+.form-group__forgot {
   font-size: 12px;
 }
 
 .form-control {
+  display: block;
   width: 100%;
-  height: 33px;
+  height: 32px;
   padding: 5px 12px;
   font-size: 14px;
   line-height: 20px;
   color: var(--color-fg-default);
   background-color: var(--color-canvas-default);
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--color-input-border);
   border-radius: 6px;
   outline: none;
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
@@ -444,149 +377,167 @@ export default Footer
 
 .form-control:focus {
   border-color: var(--color-accent-fg);
-  box-shadow: 0 0 0 1px var(--color-accent-fg);
+  box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.3);
 }
 
 .btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  width: 100%;
   height: 32px;
   padding: 5px 16px;
   font-size: 14px;
   font-weight: 500;
+  line-height: 20px;
   border-radius: 6px;
-  cursor: pointer;
   border: 1px solid transparent;
-  font-family: inherit;
-}
-
-.btn-block {
-  width: 100%;
+  cursor: pointer;
+  appearance: none;
+  user-select: none;
 }
 
 .btn-primary {
   color: #ffffff;
-  background-color: var(--color-success-fg);
+  background-color: var(--color-btn-primary-bg);
   border-color: rgba(31, 35, 40, 0.15);
-  font-size: 14px;
-  font-weight: 600;
-  height: 36px;
+  margin-top: 16px;
 }
 
 .btn-primary:hover {
-  background-color: rgb(26, 116, 51);
+  background-color: var(--color-btn-primary-hover);
 }
 
-.btn-primary:active {
-  background-color: rgb(22, 102, 45);
-}
-
-.social-btn {
-  margin-top: 10px;
+.btn-social {
   color: var(--color-fg-default);
-  background-color: var(--color-canvas-subtle);
-  border-color: var(--color-border-default);
+  background-color: var(--color-canvas-default);
+  border: 1px solid var(--color-border-default);
+  margin-bottom: 12px;
   font-weight: 500;
 }
 
-.social-btn:hover {
-  background-color: #eef1f4;
+.btn-social:hover {
+  background-color: var(--color-canvas-subtle);
 }
 
-.social-icon {
-  flex-shrink: 0;
+.btn-social__icon {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 8px;
 }
 
-.validation-message {
-  color: #cf222e;
-  font-size: 12px;
-  margin: -8px 0 12px;
-  text-align: left;
+.login-form__status {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--color-btn-primary-bg);
 }
 
-.login-divider {
-  position: relative;
-  text-align: center;
+.login-form__divider {
+  display: flex;
+  align-items: center;
   margin: 16px 0;
-  color: var(--color-fg-default);
+  color: var(--color-fg-muted);
   font-size: 14px;
 }
 
-.login-divider::before,
-.login-divider::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  width: calc(50% - 20px);
+.login-form__divider-line {
+  flex: 1;
   height: 1px;
   background-color: var(--color-border-default);
 }
 
-.login-divider::before {
-  left: 0;
+.login-form__divider-text {
+  padding: 0 16px;
 }
 
-.login-divider::after {
-  right: 0;
-}
-
-.login-divider span {
-  position: relative;
-  padding: 0 8px;
-  background-color: var(--color-canvas-default);
-}
-
-.create-account {
+.login-form__signup {
   text-align: center;
-  margin-top: 16px;
   font-size: 14px;
   color: var(--color-fg-default);
-}
-
-.passkey-row {
-  text-align: center;
   margin-top: 16px;
 }
 
-.passkey-link {
+.login-form__passkey {
+  text-align: center;
   font-size: 14px;
-  font-weight: 600;
+  margin-top: 16px;
 }
 
-.site-footer {
-  margin-top: auto;
+===FILE: src/components/GitHubMark.tsx===
+function GitHubMark() {
+  return (
+    <svg height="48" width="48" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+    </svg>
+  )
+}
+
+export default GitHubMark
+
+===FILE: src/components/Footer.tsx===
+import './Footer.css'
+
+function Footer() {
+  return (
+    <footer className="footer">
+      <nav className="footer__nav" aria-label="Footer">
+        <a href="https://docs.github.com/site-policy/github-terms/github-terms-of-service">
+          Terms
+        </a>
+        <a href="https://docs.github.com/site-policy/privacy-policies/github-privacy-statement">
+          Privacy
+        </a>
+        <a href="https://docs.github.com">Docs</a>
+        <a href="https://support.github.com">Contact GitHub Support</a>
+        <button type="button" className="footer__link-btn">
+          Manage cookies
+        </button>
+        <button type="button" className="footer__link-btn">
+          Do not share my personal information
+        </button>
+      </nav>
+    </footer>
+  )
+}
+
+export default Footer
+
+===FILE: src/components/Footer.css===
+.footer {
+  flex-shrink: 0;
+  width: 100%;
   padding: 24px 16px;
   background-color: var(--color-canvas-subtle);
   border-top: 1px solid var(--color-border-default);
+  margin-top: 48px;
 }
 
-.footer-links {
-  list-style: none;
+.footer__nav {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 8px 16px;
-  margin: 0;
-  padding: 0;
+  gap: 16px;
   max-width: 1012px;
-  margin-inline: auto;
+  margin: 0 auto;
 }
 
-.footer-links a {
+.footer__nav a,
+.footer__link-btn {
   font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.footer__nav a:hover,
+.footer__link-btn:hover {
   color: var(--color-accent-fg);
+  text-decoration: underline;
 }
 
-.footer-links li {
-  display: flex;
-}
-
-@media (max-width: 544px) {
-  .footer-links {
-    flex-direction: column;
-    gap: 8px;
-  }
+.footer__link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
 }

@@ -1,39 +1,109 @@
 {
   "site_id": "baidu",
-  "score": 77.5,
+  "score": 79.2,
   "dimensions": {
-    "visual": 75.3,
+    "visual": 79.6,
     "functional": 83.3,
     "interaction": 70.0
   },
   "visual_detail": {
     "desktop": {
-      "ssim": 0.8273,
-      "pixel_diff_ratio": 0.076,
+      "ssim": 0.8413,
+      "pixel_diff_ratio": 0.0648,
       "phash_distance": 12
     },
     "mobile": {
-      "ssim": 0.6957,
-      "pixel_diff_ratio": 0.1375,
-      "phash_distance": 18
+      "ssim": 0.7562,
+      "pixel_diff_ratio": 0.0968,
+      "phash_distance": 34
+    }
+  },
+  "scoped_visual_detail": {
+    "desktop": {
+      "modules": {
+        "search-input": {
+          "ssim": 0.9154,
+          "pixel_diff_ratio": 0.0307,
+          "phash_distance": 8,
+          "present": true
+        }
+      },
+      "aggregate": {
+        "ssim": 0.9154,
+        "pixel_diff_ratio": 0.0307,
+        "phash_distance": 8.0
+      },
+      "present": 1,
+      "total": 1
+    },
+    "mobile": {
+      "modules": {
+        "search-input": {
+          "ssim": 0.7125,
+          "pixel_diff_ratio": 0.0965,
+          "phash_distance": 22,
+          "present": true
+        }
+      },
+      "aggregate": {
+        "ssim": 0.7125,
+        "pixel_diff_ratio": 0.0965,
+        "phash_distance": 22.0
+      },
+      "present": 1,
+      "total": 1
     }
   },
   "llm_visual": {
     "desktop": {
-      "layout": 88,
-      "color": 82,
-      "typography": 84,
-      "components": 80,
-      "overall": 84,
-      "comment": "整体布局与百度首页高度一致，导航、logo、搜索框、热搜区块位置还原到位；但logo字体偏粗、搜索框内图标和按钮样式略有差异，热搜编号配色和右下角悬浮按钮缺失，细节还原稍逊。"
+      "layout": 84,
+      "color": 80,
+      "typography": 82,
+      "components": 83,
+      "overall": 82,
+      "comment": "搜索框、按钮与热搜列表均还原到位，整体结构接近，但按钮配色与列表序号颜色、双列排序细节有差异。",
+      "modules": [
+        {
+          "name": "顶部搜索输入框，可聚焦输入文字",
+          "score": 88,
+          "note": "尺寸位置和占位文案一致，右侧图标排布略有缩小但基本还原。"
+        },
+        {
+          "name": "搜索按钮（百度一下）",
+          "score": 80,
+          "note": "位置正确，但原图为蓝色渐变圆角按钮，复刻为扁平纯色，质感略弱。"
+        },
+        {
+          "name": "搜索结果列表，每条含标题与摘要文案",
+          "score": 80,
+          "note": "条目标题文案齐全，但序号配色（原图首条红/热标）偏灰，双列排序顺序与原图不一致。"
+        }
+      ]
     },
     "mobile": {
-      "layout": 62,
-      "color": 80,
-      "typography": 68,
-      "components": 70,
-      "overall": 70,
-      "comment": "主要区块都在，但复刻为窄屏布局，导航换行、搜索框与logo比例偏差较大，配色基本贴合但字体层级和组件细节还原一般"
+      "layout": 70,
+      "color": 82,
+      "typography": 78,
+      "components": 80,
+      "overall": 77,
+      "comment": "搜索框、按钮、热搜列表三个模块均还原，但整体居中改为左对齐、输入框偏窄，布局结构有偏差。",
+      "modules": [
+        {
+          "name": "顶部搜索输入框，可聚焦输入文字",
+          "score": 78,
+          "note": "输入框存在且含占位文字与图标，但宽度偏窄、改为左对齐，圆角与内边距与原版略有差异。"
+        },
+        {
+          "name": "搜索按钮（百度一下），点击触发搜索",
+          "score": 80,
+          "note": "按钮文案与蓝色基调一致，但原版为渐变紫蓝且位于框外右侧，复刻为纯蓝且嵌入框内。"
+        },
+        {
+          "name": "搜索结果列表，每条含标题与摘要文案",
+          "score": 79,
+          "note": "热搜列表标题与序号还原较好，双列排版一致，但热标签样式与间距与原版有差别。"
+        }
+      ]
     }
   },
   "coverage": {
@@ -101,5 +171,26 @@
     "visual": 0.4,
     "functional": 0.4,
     "interaction": 0.2
+  },
+  "metric_nature": {
+    "deterministic": [
+      "ssim",
+      "pixel_diff_ratio",
+      "phash_distance",
+      "element_presence",
+      "behavior_pass",
+      "assert_pass"
+    ],
+    "non_deterministic": [
+      "llm_visual"
+    ],
+    "note": "确定性指标同输入必同输出、可复现；LLM 视觉分非确定，仅作辅助交叉验证。"
+  },
+  "cross_validation": {
+    "deterministic_visual": 79.6,
+    "llm_visual_avg": 79.5,
+    "delta": 0.1,
+    "agree": true,
+    "threshold": 15.0
   }
 }

@@ -1,13 +1,13 @@
 ===FILE: package.json===
 ```json
 {
-  "name": "baidu-homepage-clone",
+  "name": "baidu-clone",
   "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -15,11 +15,9 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
-    "typescript": "^5.5.3",
-    "vite": "^5.3.4"
+    "typescript": "^5.5.4",
+    "vite": "^5.4.2"
   }
 }
 ```
@@ -50,8 +48,8 @@ export default defineConfig({
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"],
@@ -68,7 +66,8 @@ export default defineConfig({
     "module": "ESNext",
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
-    "strict": true
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   },
   "include": ["vite.config.ts"]
 }
@@ -80,6 +79,7 @@ export default defineConfig({
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>百度一下，你就知道</title>
   </head>
@@ -90,131 +90,122 @@ export default defineConfig({
 </html>
 ```
 
+===FILE: public/favicon.svg===
+```svg
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="6" fill="#4e6ef2"/>
+  <text x="16" y="23" font-size="20" font-family="Arial" font-weight="bold" fill="#fff" text-anchor="middle">百</text>
+</svg>
+```
+
 ===FILE: src/main.tsx===
 ```tsx
-import React from 'react'
-import ReactDOM from 'react-dom/client'
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
 import App from './App'
-import './index.css'
+import './styles/global.css'
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
     <App />
-  </React.StrictMode>,
+  </StrictMode>
 )
 ```
 
-===FILE: src/index.css===
-```css
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+===FILE: src/App.tsx===
+```tsx
+import { useState } from 'react'
+import TopNav from './components/TopNav'
+import Logo from './components/Logo'
+import SearchBox from './components/SearchBox'
+import HotSearch from './components/HotSearch'
+import SearchResults from './components/SearchResults'
+import Footer from './components/Footer'
+import { searchMock } from './data/mock'
+import type { SearchResult } from './data/mock'
+import './styles/app.css'
 
-html,
-body {
-  height: 100%;
-}
+const PAGE_SIZE = 5
 
-body {
-  font-family: 'PingFang SC', Arial, sans-serif;
-  color: #222;
-  background-color: #fff;
-  -webkit-font-smoothing: antialiased;
-}
+export default function App() {
+  const [query, setQuery] = useState('')
+  const [submittedQuery, setSubmittedQuery] = useState('')
+  const [results, setResults] = useState<SearchResult[]>([])
+  const [page, setPage] = useState(1)
+  const [searched, setSearched] = useState(false)
 
-a {
-  text-decoration: none;
-  color: inherit;
-}
+  const runSearch = (keyword: string) => {
+    const trimmed = keyword.trim()
+    if (!trimmed) return
+    setSubmittedQuery(trimmed)
+    setResults(searchMock(trimmed))
+    setPage(1)
+    setSearched(true)
+  }
 
-button {
-  font-family: inherit;
-  cursor: pointer;
-}
+  const handleSubmit = () => runSearch(query)
 
-input,
-textarea {
-  font-family: inherit;
-  outline: none;
-  border: none;
+  const handleHotClick = (text: string) => {
+    setQuery(text)
+    runSearch(text)
+  }
+
+  const totalPages = Math.max(1, Math.ceil(results.length / PAGE_SIZE))
+  const pageResults = results.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const handleNextPage = () => {
+    setPage((p) => Math.min(totalPages, p + 1))
+  }
+
+  const handlePrevPage = () => {
+    setPage((p) => Math.max(1, p - 1))
+  }
+
+  return (
+    <div className="page">
+      <TopNav />
+      <main className={`main ${searched ? 'main--searched' : ''}`}>
+        <Logo />
+        <SearchBox
+          value={query}
+          onChange={setQuery}
+          onSubmit={handleSubmit}
+        />
+
+        {!searched && (
+          <>
+            <div className="wenxin-banner">
+              <span className="wenxin-icon">文心</span>
+              复杂问题就找文心助手，深入思考回答更优
+              <span className="wenxin-arrow">›</span>
+            </div>
+            <HotSearch onItemClick={handleHotClick} />
+          </>
+        )}
+
+        {searched && (
+          <SearchResults
+            keyword={submittedQuery}
+            results={pageResults}
+            totalCount={results.length}
+            page={page}
+            totalPages={totalPages}
+            onNextPage={handleNextPage}
+            onPrevPage={handlePrevPage}
+          />
+        )}
+      </main>
+      <Footer />
+    </div>
+  )
 }
 ```
 
-===FILE: src/data/mock.ts===
-```ts
-export interface SearchResult {
-  id: string
-  title: string
-  summary: string
-  source: string
-  date: string
-  url: string
-}
+===FILE: src/components/TopNav.tsx===
+```tsx
+import './TopNav.css'
 
-const summaryTemplates = [
-  '关于“{kw}”的最新资讯与详细介绍，涵盖背景、发展与相关动态，帮助你快速了解全貌。',
-  '{kw} 的百科解释、相关词条与延伸阅读，收录权威资料与网友讨论内容。',
-  '本页汇总了 {kw} 的热门话题、图片、视频以及实时更新的相关新闻报道。',
-  '查找 {kw} 相关的产品、服务与教程，提供多角度的解读和实用参考信息。',
-  '{kw} 怎么样？看看大家都在讨论什么，这里有最全面的观点汇总与评测分析。',
-  '权威机构与媒体对 {kw} 的报道集合，包含数据统计、专家观点与深度分析。',
-  '{kw} 入门指南：从基础概念到进阶技巧，一文带你全面掌握相关知识要点。',
-  '网友热议 {kw}，相关问答、经验分享与常见问题解答，助你少走弯路。',
-]
-
-const sources = [
-  '百度百科',
-  '新华网',
-  '人民网',
-  '知乎',
-  '搜狐网',
-  '腾讯网',
-  '今日头条',
-  '中国新闻网',
-  '澎湃新闻',
-  '百度知道',
-]
-
-function pad(n: number): string {
-  return n < 10 ? `0${n}` : `${n}`
-}
-
-function dateForIndex(index: number): string {
-  const base = new Date(2024, 0, 1)
-  base.setDate(base.getDate() - index * 3)
-  return `${base.getFullYear()}-${pad(base.getMonth() + 1)}-${pad(base.getDate())}`
-}
-
-const PAGE_SIZE = 10
-
-export function getResults(keyword: string, page: number): SearchResult[] {
-  const kw = keyword.trim()
-  const start = (page - 1) * PAGE_SIZE
-  const results: SearchResult[] = []
-  for (let i = 0; i < PAGE_SIZE; i++) {
-    const globalIndex = start + i
-    const summary = summaryTemplates[globalIndex % summaryTemplates.length].replace(
-      /\{kw\}/g,
-      kw,
-    )
-    results.push({
-      id: `${kw}-${globalIndex}`,
-      title: `${kw}${globalIndex === 0 ? '' : '_'}${globalIndex === 0 ? '' : '相关结果 ' + (globalIndex + 1)}${globalIndex === 0 ? ' - 百度搜索' : ''}`.trim() || kw,
-      summary,
-      source: sources[globalIndex % sources.length],
-      date: dateForIndex(globalIndex),
-      url: `https://www.baidu.com/s?wd=${encodeURIComponent(kw)}&pn=${globalIndex}`,
-    })
-  }
-  return results
-}
-
-export const RESULTS_PER_PAGE = PAGE_SIZE
-export const TOTAL_PAGES = 10
-
-export const topNav = [
+const navItems = [
   '新闻',
   'hao123',
   '地图',
@@ -223,640 +214,848 @@ export const topNav = [
   '图片',
   '网盘',
   '文库',
-  '关于DuMate',
-  '设置',
+  '文心',
+  '搭子DuMate',
+  '更多',
 ]
 
-export interface HotItem {
-  rank: number
-  text: string
-  hot?: boolean
-}
-
-export const hotSearch: HotItem[] = [
-  { rank: 0, text: '坚持高质量发展是硬道理' },
-  { rank: 1, text: '我国有了“太空粮仓”', hot: true },
-  { rank: 2, text: '14条措施支持民营经济 提振发展信心' },
-  { rank: 3, text: '把绿水青山 转化为金山银山' },
-  { rank: 4, text: '“数字中国 加速跑”', hot: true },
-  { rank: 5, text: '消费市场持续回暖向好', hot: true },
-  { rank: 6, text: '科技自立自强 迈出坚实步伐', hot: true },
-  { rank: 7, text: '一组数据200余 看经济运行态势' },
-  { rank: 8, text: '春耕备耕忙起来 农业生产开局良好', hot: true },
-  { rank: 9, text: '乡村振兴绘就壮美新画卷' },
-]
-```
-
-===FILE: src/components/Icons.tsx===
-```tsx
-export function MicIcon() {
+export default function TopNav() {
   return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#666" strokeWidth="1.6">
-      <rect x="9" y="3" width="6" height="11" rx="3" />
-      <path d="M6 11a6 6 0 0 0 12 0" />
-      <line x1="12" y1="17" x2="12" y2="21" />
-      <line x1="9" y1="21" x2="15" y2="21" />
-    </svg>
-  )
-}
-
-export function ClipIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#666" strokeWidth="1.6">
-      <path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-3-3l7.5-7.5" />
-    </svg>
-  )
-}
-
-export function ImageIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#666" strokeWidth="1.6">
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <circle cx="8.5" cy="9.5" r="1.8" />
-      <path d="m4 18 5-5 4 4 3-3 4 4" />
-    </svg>
-  )
-}
-
-export function RefreshIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#9195a3" strokeWidth="2">
-      <path d="M4 12a8 8 0 0 1 13.7-5.7L20 8" />
-      <path d="M20 4v4h-4" />
-      <path d="M20 12a8 8 0 0 1-13.7 5.7L4 16" />
-      <path d="M4 20v-4h4" />
-    </svg>
+    <nav className="top-nav">
+      <div className="top-nav__links">
+        {navItems.map((item) => (
+          <a key={item} href="#" className="top-nav__link">
+            {item}
+          </a>
+        ))}
+      </div>
+    </nav>
   )
 }
 ```
 
-===FILE: src/App.tsx===
-```tsx
-import { useMemo, useState } from 'react'
-import './App.css'
-import {
-  getResults,
-  hotSearch,
-  topNav,
-  TOTAL_PAGES,
-  type SearchResult,
-} from './data/mock'
-import { ClipIcon, ImageIcon, MicIcon, RefreshIcon } from './components/Icons'
-
-function rankColor(rank: number): string {
-  if (rank === 0) return '#fe2d46'
-  if (rank === 1) return '#f60'
-  if (rank === 2) return '#ff8547'
-  return '#999'
+===FILE: src/components/TopNav.css===
+```css
+.top-nav {
+  width: 100%;
+  padding: 18px 24px 0;
+  box-sizing: border-box;
 }
 
-export default function App() {
-  const [input, setInput] = useState('')
-  const [keyword, setKeyword] = useState('')
-  const [page, setPage] = useState(1)
-  const [searched, setSearched] = useState(false)
+.top-nav__links {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+}
 
-  const results: SearchResult[] = useMemo(() => {
-    if (!searched || !keyword) return []
-    return getResults(keyword, page)
-  }, [searched, keyword, page])
+.top-nav__link {
+  color: #222;
+  font-size: 14px;
+  text-decoration: none;
+  font-family: 'PingFang SC', Arial, sans-serif;
+}
 
-  const runSearch = (term: string) => {
-    const value = term.trim()
-    if (!value) return
-    setKeyword(value)
-    setPage(1)
-    setSearched(true)
-  }
+.top-nav__link:hover {
+  color: #4e6ef2;
+  text-decoration: underline;
+}
+```
 
-  const handleSubmit = () => runSearch(input)
+===FILE: src/components/Logo.tsx===
+```tsx
+import './Logo.css'
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      handleSubmit()
-    }
-  }
-
-  const goToPage = (next: number) => {
-    if (next < 1 || next > TOTAL_PAGES) return
-    setPage(next)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
+export default function Logo() {
   return (
-    <div className="page">
-      <header className="top-nav">
-        <nav className="top-nav-links">
-          {topNav.map((item) => (
-            <a key={item} href="#" className="top-nav-link">
-              {item}
-            </a>
-          ))}
-        </nav>
-      </header>
-
-      <main className="main">
-        <div className="logo">
-          <span className="logo-bai">Bai</span>
-          <span className="logo-du">du</span>
-          <span className="logo-cn">百度</span>
-        </div>
-
-        <div className="search-box">
-          <textarea
-            className="search-input"
-            data-testid="search-input"
-            placeholder="百度一下，你就知道"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            rows={1}
-          />
-          <div className="search-tools">
-            <button className="tool-btn" title="语音" type="button">
-              <MicIcon />
-            </button>
-            <button className="tool-btn" title="附件" type="button">
-              <ClipIcon />
-            </button>
-            <button className="tool-btn" title="图片" type="button">
-              <ImageIcon />
-            </button>
-            <button
-              className="search-button"
-              data-testid="search-button"
-              type="submit"
-              onClick={handleSubmit}
-            >
-              百度一下
-            </button>
-          </div>
-        </div>
-
-        <div className="wenxin-banner">
-          <span className="wenxin-logo">文心</span>
-          <span className="wenxin-text">免费体验文心一言，开启你的智能助手之旅</span>
-          <span className="wenxin-arrow">›</span>
-        </div>
-
-        {!searched ? (
-          <section className="hot-search">
-            <div className="hot-head">
-              <div className="hot-title">
-                百度<span className="hot-title-accent">热搜</span> ›
-              </div>
-              <div className="hot-refresh">
-                <RefreshIcon /> 换一换
-              </div>
-            </div>
-            <ol className="hot-list">
-              {hotSearch.map((item) => (
-                <li key={item.rank} className="hot-item">
-                  <button
-                    type="button"
-                    className="hot-link"
-                    onClick={() => {
-                      setInput(item.text)
-                      runSearch(item.text)
-                    }}
-                  >
-                    <span
-                      className="hot-rank"
-                      style={{ color: rankColor(item.rank) }}
-                    >
-                      {item.rank === 0 ? '不' : item.rank}
-                    </span>
-                    <span className="hot-text">{item.text}</span>
-                    {item.hot && <span className="hot-tag">热</span>}
-                  </button>
-                </li>
-              ))}
-            </ol>
-          </section>
-        ) : (
-          <section className="results">
-            <div className="results-meta">
-              搜索 <strong>{keyword}</strong> 找到约 1,250,000 个结果（第 {page} 页）
-            </div>
-            <ul className="result-list" data-testid="result-list">
-              {results.map((r) => (
-                <li key={r.id} className="result-item">
-                  <a href={r.url} className="result-title" onClick={(e) => e.preventDefault()}>
-                    {r.title}
-                  </a>
-                  <p className="result-summary">{r.summary}</p>
-                  <div className="result-foot">
-                    <span className="result-source">{r.source}</span>
-                    <span className="result-date">{r.date}</span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-
-            <div className="pagination" data-testid="pagination">
-              <button
-                className="page-btn"
-                data-testid="prev-page"
-                onClick={() => goToPage(page - 1)}
-                disabled={page <= 1}
-              >
-                上一页
-              </button>
-              <span className="page-indicator">
-                第 {page} / {TOTAL_PAGES} 页
-              </span>
-              <button
-                className="page-btn next"
-                data-testid="next-page"
-                onClick={() => goToPage(page + 1)}
-                disabled={page >= TOTAL_PAGES}
-              >
-                下一页
-              </button>
-            </div>
-          </section>
-        )}
-      </main>
-
-      <footer className="footer">
-        <div className="footer-links">
-          <a href="#">设为首页</a>
-          <a href="#">About Baidu</a>
-          <a href="#">百度营销</a>
-          <a href="#">使用百度前必读</a>
-          <a href="#">意见反馈</a>
-          <span>京公网安备11000002000001号</span>
-          <span>京ICP证030173号</span>
-        </div>
-      </footer>
+    <div className="logo">
+      <span className="logo__bai">Bai</span>
+      <span className="logo__du">du</span>
+      <span className="logo__cn">百度</span>
     </div>
   )
 }
 ```
 
-===FILE: src/App.css===
+===FILE: src/components/Logo.css===
 ```css
-.page {
-  min-height: 100vh;
+.logo {
   display: flex;
-  flex-direction: column;
-  background: #fff;
+  align-items: flex-end;
+  justify-content: center;
+  font-family: Arial, sans-serif;
+  font-weight: 700;
+  user-select: none;
+  margin-bottom: 22px;
 }
 
-/* Top navigation */
-.top-nav {
-  width: 100%;
-  height: 60px;
-  display: flex;
-  align-items: center;
-  padding: 0 24px;
+.logo__bai {
+  font-size: 44px;
+  color: #2932e1;
+  letter-spacing: -1px;
 }
 
-.top-nav-links {
-  display: flex;
-  gap: 26px;
-  align-items: center;
-}
-
-.top-nav-link {
-  font-size: 14px;
-  color: #222;
-}
-
-.top-nav-link:hover {
+.logo__du {
+  font-size: 44px;
   color: #4e6ef2;
+  letter-spacing: -1px;
 }
 
-/* Main */
-.main {
-  flex: 1;
+.logo__cn {
+  font-size: 44px;
+  color: #2932e1;
+  margin-left: 4px;
+}
+```
+
+===FILE: src/components/SearchBox.tsx===
+```tsx
+import './SearchBox.css'
+
+interface SearchBoxProps {
+  value: string
+  onChange: (value: string) => void
+  onSubmit: () => void
+}
+
+export default function SearchBox({ value, onChange, onSubmit }: SearchBoxProps) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      onSubmit()
+    }
+  }
+
+  return (
+    <div className="search-box">
+      <div className="search-box__field">
+        <textarea
+          data-testid="search-input"
+          className="search-box__input"
+          placeholder="演员刘洵去世"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          rows={1}
+        />
+        <div className="search-box__tools">
+          <button className="search-box__tool" type="button" title="语音">
+            <MicIcon />
+          </button>
+          <button className="search-box__tool" type="button" title="附件">
+            <ClipIcon />
+          </button>
+          <button className="search-box__tool" type="button" title="图片">
+            <ImageIcon />
+          </button>
+          <button
+            data-testid="search-button"
+            className="search-box__submit"
+            type="button"
+            onClick={onSubmit}
+          >
+            百度一下
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MicIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#878a99" strokeWidth="2">
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0" />
+      <line x1="12" y1="18" x2="12" y2="21" />
+    </svg>
+  )
+}
+
+function ClipIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#878a99" strokeWidth="2">
+      <path d="M21 11.5l-8.5 8.5a5 5 0 0 1-7-7l8.5-8.5a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3l8-8" />
+    </svg>
+  )
+}
+
+function ImageIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#878a99" strokeWidth="2">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="8.5" cy="9.5" r="1.5" />
+      <path d="M21 16l-5-5L5 20" />
+    </svg>
+  )
+}
+```
+
+===FILE: src/components/SearchBox.css===
+```css
+.search-box {
   width: 100%;
   max-width: 800px;
   margin: 0 auto;
-  padding: 24px 16px 60px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
 }
 
-/* Logo */
-.logo {
-  font-family: Arial, sans-serif;
-  font-weight: 700;
-  font-size: 56px;
-  letter-spacing: -1px;
-  margin: 30px 0 36px;
-  display: flex;
-  align-items: baseline;
-}
-
-.logo-bai {
-  color: #4e6ef2;
-}
-
-.logo-du {
-  color: #f73131;
-}
-
-.logo-cn {
-  color: #4e6ef2;
-  font-size: 52px;
-  margin-left: 2px;
-}
-
-/* Search box */
-.search-box {
-  width: 100%;
-  border: 2px solid #4e6ef2;
-  border-radius: 14px;
-  padding: 16px 18px 12px;
-  background: #fff;
+.search-box__field {
+  position: relative;
+  border: 1px solid #4e6ef2;
+  border-radius: 12px;
+  padding: 16px 18px 56px;
   box-shadow: 0 2px 10px rgba(78, 110, 242, 0.08);
+  background: #fff;
 }
 
-.search-input {
+.search-box__input {
   width: 100%;
-  font-size: 16px;
-  color: #222;
-  line-height: 1.4;
+  border: none;
+  outline: none;
   resize: none;
-  min-height: 28px;
+  font-size: 16px;
+  line-height: 22px;
+  color: #222;
+  font-family: 'PingFang SC', Arial, sans-serif;
   background: transparent;
+  min-height: 22px;
+  overflow: hidden;
 }
 
-.search-input::placeholder {
+.search-box__input::placeholder {
   color: #9195a3;
 }
 
-.search-tools {
+.search-box__tools {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 14px;
-  margin-top: 18px;
+  gap: 8px;
 }
 
-.tool-btn {
+.search-box__tool {
   width: 34px;
   height: 34px;
   border: none;
   background: transparent;
-  border-radius: 8px;
+  border-radius: 50%;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.15s;
 }
 
-.tool-btn:hover {
-  background: #f6f7fe;
+.search-box__tool:hover {
+  background: #f1f3ff;
 }
 
-.search-button {
+.search-box__submit {
   margin-left: 8px;
-  height: 44px;
+  height: 40px;
   padding: 0 26px;
   border: none;
-  border-radius: 22px;
+  border-radius: 10px;
+  background: #4e6ef2;
   color: #fff;
   font-size: 16px;
-  background: linear-gradient(90deg, #4e6ef2, #5a7bff);
-  transition: filter 0.15s;
-}
-
-.search-button:hover {
-  filter: brightness(1.05);
-}
-
-/* Wenxin banner */
-.wenxin-banner {
-  margin-top: 28px;
-  height: 44px;
-  padding: 0 18px;
-  background: #f6f7fe;
-  border-radius: 22px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
   cursor: pointer;
+  font-family: 'PingFang SC', Arial, sans-serif;
+  transition: background 0.15s;
 }
 
-.wenxin-logo {
-  font-size: 13px;
-  color: #4e6ef2;
-  background: #e8ecff;
-  border-radius: 12px;
-  padding: 3px 10px;
+.search-box__submit:hover {
+  background: #4156d6;
+}
+```
+
+===FILE: src/components/HotSearch.tsx===
+```tsx
+import { hotList } from '../data/mock'
+import './HotSearch.css'
+
+interface HotSearchProps {
+  onItemClick: (text: string) => void
 }
 
-.wenxin-text {
-  font-size: 14px;
-  color: #333;
+export default function HotSearch({ onItemClick }: HotSearchProps) {
+  return (
+    <section className="hot-search">
+      <div className="hot-search__head">
+        <span className="hot-search__title">
+          百度<span className="hot-search__title-accent">热搜</span>
+          <span className="hot-search__arrow">›</span>
+        </span>
+        <button className="hot-search__refresh" type="button">
+          <RefreshIcon /> 换一换
+        </button>
+      </div>
+      <ul className="hot-search__list">
+        {hotList.map((item, index) => (
+          <li key={item.id} className="hot-search__item">
+            <button
+              className="hot-search__entry"
+              type="button"
+              onClick={() => onItemClick(item.text)}
+            >
+              <span className={`hot-search__rank rank-${index + 1}`}>
+                {index + 1}
+              </span>
+              <span className="hot-search__text">{item.text}</span>
+              {item.tag && (
+                <span className={`hot-search__tag tag--${item.tag}`}>
+                  {item.tag === 'hot' ? '热' : '新'}
+                </span>
+              )}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
 }
 
-.wenxin-arrow {
-  color: #9195a3;
-  font-size: 18px;
+function RefreshIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+      <path d="M21 3v6h-6" />
+    </svg>
+  )
 }
+```
 
-/* Hot search */
+===FILE: src/components/HotSearch.css===
+```css
 .hot-search {
   width: 100%;
-  margin-top: 40px;
+  max-width: 800px;
+  margin: 40px auto 0;
 }
 
-.hot-head {
+.hot-search__head {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   margin-bottom: 14px;
 }
 
-.hot-title {
+.hot-search__title {
   font-size: 18px;
   font-weight: 700;
   color: #222;
+  display: inline-flex;
+  align-items: center;
 }
 
-.hot-title-accent {
-  color: #f73131;
+.hot-search__title-accent {
+  color: #4e6ef2;
 }
 
-.hot-refresh {
-  display: flex;
+.hot-search__arrow {
+  color: #9195a3;
+  margin-left: 6px;
+  font-weight: 400;
+}
+
+.hot-search__refresh {
+  border: none;
+  background: transparent;
+  color: #9195a3;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
-  color: #9195a3;
-  cursor: pointer;
 }
 
-.hot-list {
+.hot-search__refresh:hover {
+  color: #4e6ef2;
+}
+
+.hot-search__list {
   list-style: none;
+  margin: 0;
+  padding: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  column-gap: 50px;
-  row-gap: 8px;
+  column-gap: 40px;
 }
 
-.hot-item {
-  display: flex;
+.hot-search__item {
+  border-radius: 6px;
 }
 
-.hot-link {
+.hot-search__entry {
   width: 100%;
   display: flex;
   align-items: center;
   gap: 12px;
-  background: transparent;
+  padding: 9px 8px;
   border: none;
-  padding: 6px 4px;
+  background: transparent;
+  cursor: pointer;
   text-align: left;
   border-radius: 6px;
 }
 
-.hot-link:hover {
+.hot-search__entry:hover {
   background: #f6f7fe;
 }
 
-.hot-link:hover .hot-text {
-  color: #4e6ef2;
-}
-
-.hot-rank {
+.hot-search__rank {
   width: 18px;
-  font-size: 15px;
-  font-weight: 700;
   text-align: center;
+  font-size: 14px;
+  color: #9195a3;
   flex-shrink: 0;
+  font-family: Arial, sans-serif;
 }
 
-.hot-text {
-  font-size: 15px;
+.hot-search__rank.rank-1 { color: #fe2d46; }
+.hot-search__rank.rank-2 { color: #f60; }
+.hot-search__rank.rank-3 { color: #ff9406; }
+
+.hot-search__text {
+  font-size: 14px;
   color: #222;
+  flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.hot-tag {
-  font-size: 11px;
+.hot-search__entry:hover .hot-search__text {
+  color: #4e6ef2;
+}
+
+.hot-search__tag {
+  font-size: 12px;
   color: #fff;
-  background: #fe2d46;
   border-radius: 3px;
-  padding: 1px 4px;
+  padding: 1px 5px;
   flex-shrink: 0;
 }
 
-/* Results */
-.results {
-  width: 100%;
-  margin-top: 36px;
-  align-self: flex-start;
+.tag--hot {
+  background: #ff5b00;
 }
 
-.results-meta {
+.tag--new {
+  background: #fe2d46;
+}
+```
+
+===FILE: src/components/SearchResults.tsx===
+```tsx
+import type { SearchResult } from '../data/mock'
+import './SearchResults.css'
+
+interface SearchResultsProps {
+  keyword: string
+  results: SearchResult[]
+  totalCount: number
+  page: number
+  totalPages: number
+  onNextPage: () => void
+  onPrevPage: () => void
+}
+
+export default function SearchResults({
+  keyword,
+  results,
+  totalCount,
+  page,
+  totalPages,
+  onNextPage,
+  onPrevPage,
+}: SearchResultsProps) {
+  return (
+    <section className="results">
+      <div className="results__meta">
+        关于 <span className="results__keyword">{keyword}</span> 的搜索结果约
+        {' '}{totalCount.toLocaleString()} 个
+      </div>
+
+      <ul className="results__list" data-testid="result-list">
+        {results.map((item) => (
+          <li key={item.id} className="results__item">
+            <h3 className="results__title">
+              <a href="#" onClick={(e) => e.preventDefault()}>
+                {item.title}
+              </a>
+            </h3>
+            <div className="results__source">{item.source}</div>
+            <p className="results__abstract">{item.abstract}</p>
+          </li>
+        ))}
+      </ul>
+
+      <div className="results__pagination">
+        <button
+          className="results__page-btn"
+          type="button"
+          onClick={onPrevPage}
+          disabled={page <= 1}
+        >
+          上一页
+        </button>
+        <span className="results__page-info">
+          第 {page} / {totalPages} 页
+        </span>
+        <button
+          data-testid="next-page"
+          className="results__page-btn results__page-btn--next"
+          type="button"
+          onClick={onNextPage}
+          disabled={page >= totalPages}
+        >
+          下一页 ›
+        </button>
+      </div>
+    </section>
+  )
+}
+```
+
+===FILE: src/components/SearchResults.css===
+```css
+.results {
+  width: 100%;
+  max-width: 800px;
+  margin: 24px auto 0;
+  text-align: left;
+}
+
+.results__meta {
   font-size: 13px;
   color: #9195a3;
   margin-bottom: 18px;
 }
 
-.results-meta strong {
-  color: #4e6ef2;
+.results__keyword {
+  color: #fe2d46;
 }
 
-.result-list {
+.results__list {
   list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 26px;
+  margin: 0;
+  padding: 0;
 }
 
-.result-item {
-  max-width: 700px;
+.results__item {
+  margin-bottom: 22px;
 }
 
-.result-title {
+.results__title {
+  margin: 0 0 4px;
   font-size: 18px;
-  color: #0000ee;
+  font-weight: 400;
   line-height: 1.4;
 }
 
-.result-title:hover {
+.results__title a {
+  color: #2440b3;
+  text-decoration: none;
+}
+
+.results__title a:hover {
   text-decoration: underline;
 }
 
-.result-summary {
-  font-size: 14px;
-  color: #333;
-  line-height: 1.7;
-  margin-top: 6px;
-}
-
-.result-foot {
-  display: flex;
-  gap: 14px;
-  margin-top: 8px;
+.results__source {
   font-size: 13px;
   color: #9195a3;
+  margin-bottom: 4px;
 }
 
-.result-source {
-  color: #4e6ef2;
+.results__abstract {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #333;
 }
 
-/* Pagination */
-.pagination {
+.results__pagination {
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-top: 40px;
+  margin: 30px 0 40px;
 }
 
-.page-btn {
-  min-width: 84px;
-  height: 38px;
-  border: 1px solid #e0e3ee;
-  background: #fff;
+.results__page-btn {
+  padding: 7px 18px;
+  border: 1px solid #e0e3eb;
   border-radius: 8px;
-  font-size: 14px;
+  background: #fff;
   color: #4e6ef2;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: 'PingFang SC', Arial, sans-serif;
 }
 
-.page-btn:hover:not(:disabled) {
+.results__page-btn:hover:not(:disabled) {
   border-color: #4e6ef2;
   background: #f6f7fe;
 }
 
-.page-btn:disabled {
+.results__page-btn:disabled {
   color: #bbb;
   cursor: not-allowed;
+  border-color: #eee;
 }
 
-.page-indicator {
-  font-size: 14px;
+.results__page-btn--next {
+  background: #4e6ef2;
+  color: #fff;
+  border-color: #4e6ef2;
+}
+
+.results__page-btn--next:hover:not(:disabled) {
+  background: #4156d6;
+}
+
+.results__page-btn--next:disabled {
+  background: #c4cdf7;
+  color: #fff;
+  border-color: #c4cdf7;
+}
+
+.results__page-info {
+  font-size: 13px;
   color: #333;
 }
+```
 
-/* Footer */
+===FILE: src/components/Footer.tsx===
+```tsx
+import './Footer.css'
+
+const links = [
+  '关于百度',
+  'About Baidu',
+  '使用百度前必读',
+  '帮助中心',
+  '企业推广',
+]
+
+const records = [
+  '京公网安备11000002000001号',
+  '京ICP证030173号',
+  '互联网新闻信息服务许可11220180008',
+  '网络文化经营许可证：京网文〔2026〕0171-042号',
+]
+
+export default function Footer() {
+  return (
+    <footer className="footer">
+      <div className="footer__links">
+        {links.map((link) => (
+          <a key={link} href="#" className="footer__link">
+            {link}
+          </a>
+        ))}
+      </div>
+      <div className="footer__records">
+        {records.map((rec) => (
+          <span key={rec} className="footer__record">
+            {rec}
+          </span>
+        ))}
+      </div>
+    </footer>
+  )
+}
+```
+
+===FILE: src/components/Footer.css===
+```css
 .footer {
+  margin-top: auto;
+  padding: 18px 24px;
   border-top: 1px solid #f1f1f1;
-  padding: 18px 16px;
-  background: #fbfbfb;
+  text-align: center;
 }
 
-.footer-links {
-  max-width: 800px;
-  margin: 0 auto;
+.footer__links {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
-  font-size: 12px;
-  color: #9195a3;
   justify-content: center;
+  gap: 16px;
+  margin-bottom: 8px;
 }
 
-.footer-links a:hover {
+.footer__link {
+  color: #9195a3;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.footer__link:hover {
   color: #4e6ef2;
+  text-decoration: underline;
+}
+
+.footer__records {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+}
+
+.footer__record {
+  color: #bbb;
+  font-size: 12px;
+}
+```
+
+===FILE: src/data/mock.ts===
+```ts
+export interface HotItem {
+  id: number
+  text: string
+  tag?: 'hot' | 'new'
+}
+
+export interface SearchResult {
+  id: number
+  title: string
+  source: string
+  abstract: string
+}
+
+export const hotList: HotItem[] = [
+  { id: 1, text: '加快高水平科技自立自强' },
+  { id: 2, text: '湖北一社区书记多看一眼救下128人', tag: 'new' },
+  { id: 3, text: '印政府警告宝莱坞：不得�researchsm抨击中国', tag: 'hot' },
+  { id: 4, text: '国家首次专门发文 这四类人群受益' },
+  { id: 5, text: '车手张秀军意外离世 留下3个孩子', tag: 'new' },
+  { id: 6, text: '中国公民在菲监狱离世 中方严正交涉' },
+  { id: 7, text: '老人与邻居互殴次日自缢 法院判了' },
+  { id: 8, text: '演员刘洵去世 曾参演《九品芝麻官》', tag: 'new' },
+  { id: 9, text: '17岁女生打赏650万 起诉退款被驳回' },
+  { id: 10, text: '市民打12345求干预天气 当地回应', tag: 'hot' },
+]
+
+const sources = [
+  '百度百科',
+  '新华网',
+  '人民网',
+  '澎湃新闻',
+  '中国新闻网',
+  '腾讯网',
+  '知乎',
+  '微博',
+  '搜狐网',
+  '网易新闻',
+  '今日头条',
+  '央视新闻',
+]
+
+export function searchMock(keyword: string): SearchResult[] {
+  const templates = [
+    `${keyword}_百度百科。${keyword}是近期备受关注的话题，本词条详细介绍了${keyword}的背景、发展过程以及相关的重要信息，帮助你快速全面了解${keyword}的来龙去脉。`,
+    `关于${keyword}的最新报道：多家媒体对${keyword}进行了跟踪报道，事件持续引发社会广泛讨论，相关部门已作出回应，更多细节正在进一步核实中。`,
+    `${keyword}相关专题汇总。这里收录了${keyword}的全部资讯、深度分析与网友热评，从不同角度解读${keyword}背后的故事与意义。`,
+    `${keyword}是什么意思？本文从多个维度解析${keyword}的含义与影响，结合实际案例为你梳理${keyword}的关键要点和常见疑问。`,
+    `${keyword}_知乎讨论。超过千名网友参与了关于${keyword}的话题讨论，高赞回答从专业角度分享了对${keyword}的独到见解。`,
+    `${keyword}最新进展与时间线梳理。我们按时间顺序整理了${keyword}事件的每一个关键节点，让你一目了然掌握${keyword}的来龙去脉。`,
+    `${keyword}图片大全 - 高清图集。精选与${keyword}相关的高清图片，涵盖多个场景与角度，为你呈现${keyword}的真实面貌。`,
+    `${keyword}官方信息发布。权威渠道关于${keyword}的正式声明和说明，内容真实可靠，建议以官方发布为准。`,
+    `${keyword}背后的真相到底是什么？深度调查报道还原${keyword}事件全貌，多方采访带你看清${keyword}的本质。`,
+    `${keyword}相关视频 - 在线观看。汇集${keyword}的精彩视频内容，包括现场画面、专家解读和网友热议，全方位记录${keyword}。`,
+    `${keyword}热议持续发酵 网友评论两极分化。围绕${keyword}的讨论在社交平台上引发热潮，不同观点激烈交锋。`,
+    `${keyword}全解析：一文读懂${keyword}。从起因到影响，从数据到观点，本文系统梳理了${keyword}的方方面面。`,
+  ]
+
+  return templates.map((abstract, index) => ({
+    id: index + 1,
+    title: `${keyword} - ${sources[index % sources.length]}`,
+    source: `${sources[index % sources.length]}  ·  ${index + 1}小时前`,
+    abstract,
+  }))
+}
+```
+
+===FILE: src/styles/global.css===
+```css
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'PingFang SC', Arial, sans-serif;
+  color: #222;
+  background: #fff;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+#root {
+  min-height: 100vh;
+}
+```
+
+===FILE: src/styles/app.css===
+```css
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.main:not(.main--searched) {
+  padding-top: 90px;
+}
+
+.main--searched {
+  padding-top: 36px;
+  align-items: stretch;
+}
+
+.wenxin-banner {
+  margin: 26px auto 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #545970;
+  background: #f6f7fe;
+  border-radius: 18px;
+  padding: 8px 18px;
+}
+
+.wenxin-icon {
+  background: linear-gradient(135deg, #4e6ef2, #6a5cff);
+  color: #fff;
+  font-size: 12px;
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+
+.wenxin-arrow {
+  color: #9195a3;
 }
 ```

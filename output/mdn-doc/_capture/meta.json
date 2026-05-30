@@ -1,0 +1,162 @@
+{
+  "site_id": "mdn-doc",
+  "url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/a",
+  "viewports": {
+    "desktop": {
+      "colors": {
+        "text": [
+          "rgb(0, 0, 0)",
+          "rgb(81, 86, 93)",
+          "rgb(4, 76, 159)",
+          "rgb(237, 238, 240)"
+        ],
+        "background": [
+          "rgb(255, 255, 255)",
+          "rgb(247, 247, 248)",
+          "rgb(236, 244, 254)",
+          "rgb(237, 238, 240)",
+          "rgb(230, 244, 234)",
+          "rgb(81, 86, 93)",
+          "rgb(206, 234, 214)",
+          "rgb(0, 0, 0)"
+        ]
+      },
+      "fonts": {
+        "family": [
+          "Inter, sans-serif",
+          "\"JetBrains Mono\", monospace"
+        ],
+        "size": [
+          "16px",
+          "24px",
+          "32px",
+          "20px",
+          "40px"
+        ]
+      },
+      "boxes": {
+        "skip-to-content": {
+          "x": 2,
+          "y": -320,
+          "width": 1261,
+          "height": 49.59375
+        },
+        "logo-home": {
+          "x": 10,
+          "y": 104,
+          "width": 99,
+          "height": 40
+        },
+        "nav-blog": {
+          "x": 966.8125,
+          "y": 106,
+          "width": 56.375,
+          "height": 36
+        },
+        "breadcrumb-web": {
+          "x": 2,
+          "y": -320,
+          "width": 1261,
+          "height": 49.59375
+        },
+        "breadcrumb-html": {
+          "x": 2,
+          "y": -320,
+          "width": 1261,
+          "height": 49.59375
+        },
+        "breadcrumb-reference": {
+          "x": 2,
+          "y": -320,
+          "width": 1261,
+          "height": 49.59375
+        },
+        "breadcrumb-elements": {
+          "x": 2,
+          "y": -320,
+          "width": 1261,
+          "height": 49.59375
+        },
+        "breadcrumb-anchor": {
+          "x": 352,
+          "y": 161,
+          "width": 30,
+          "height": 24
+        },
+        "toc-try-it": {
+          "x": 1027,
+          "y": 261,
+          "width": 52,
+          "height": 32
+        },
+        "toc-attributes": {
+          "x": 1027,
+          "y": 293,
+          "width": 86,
+          "height": 32
+        },
+        "toc-accessibility": {
+          "x": 1027,
+          "y": 325,
+          "width": 107,
+          "height": 32
+        },
+        "toc-examples": {
+          "x": 1027,
+          "y": 357,
+          "width": 87,
+          "height": 32
+        },
+        "toc-security-privacy": {
+          "x": 1027,
+          "y": 389,
+          "width": 164,
+          "height": 32
+        },
+        "toc-technical-summary": {
+          "x": 1027,
+          "y": 421,
+          "width": 157,
+          "height": 32
+        },
+        "toc-specifications": {
+          "x": 1027,
+          "y": 453,
+          "width": 119,
+          "height": 32
+        },
+        "toc-browser-compatibility": {
+          "x": 460,
+          "y": 445,
+          "width": 158,
+          "height": 20
+        },
+        "toc-see-also": {
+          "x": 1027,
+          "y": 517,
+          "width": 80,
+          "height": 32
+        },
+        "content-global-attributes": {
+          "x": 2,
+          "y": -320,
+          "width": 1261,
+          "height": 49.59375
+        },
+        "content-attr-download": {
+          "x": 288,
+          "y": 2127.5,
+          "width": 80,
+          "height": 20
+        },
+        "content-attr-hreflang": {
+          "x": 288,
+          "y": 3536.5,
+          "width": 80,
+          "height": 20
+        }
+      },
+      "screenshot": "desktop.png"
+    }
+  }
+}

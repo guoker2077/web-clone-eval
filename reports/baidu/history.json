@@ -2,26 +2,32 @@
   "history": [
     {
       "round": 0,
-      "score": 78.1,
+      "score": 79.2,
       "dimensions": {
-        "visual": 77.0,
+        "visual": 79.6,
         "functional": 83.3,
         "interaction": 70.0
       }
     },
     {
       "round": 1,
-      "error": "Command '['npm', 'run', 'build']' returned non-zero exit status 2."
+      "score": 75.0,
+      "dimensions": {
+        "visual": 69.1,
+        "functional": 83.3,
+        "interaction": 70.0
+      }
     },
     {
       "round": 2,
-      "score": 79.6,
+      "score": 79.2,
       "dimensions": {
-        "visual": 80.6,
+        "visual": 79.6,
         "functional": 83.3,
         "interaction": 70.0
       }
     }
   ],
-  "best_score": 79.6
+  "best_round": 0,
+  "best_score": 79.2
 }

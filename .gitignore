@@ -38,3 +38,8 @@ data/
 .DS_Store
 .idea/
 *.log
+
+# 验收证据：run_logs 下的运行日志需随仓库提交（EVIDENCE.md 引用），覆盖 *.log
+!run_logs/
+!run_logs/**/*.log
+run_logs/**/.lastid

@@ -1,0 +1,29 @@
+[capture] 完成 baidu: /app/output/baidu/_capture
+
+===== Round 0 =====
+[generate] round0 写入 23 个文件 -> /app/output/baidu
+[eval] npm install @ /app/output/baidu
+[eval] npm run build
+[eval] baidu 总分 79.2 (视觉 79.6 / 功能 83.3 / 交互 70.0)
+
+===== Round 1 =====
+[generate] round1 写入 22 个文件 -> /app/output/baidu
+[eval] npm install @ /app/output/baidu
+[eval] npm run build
+[eval] baidu 总分 75.0 (视觉 69.1 / 功能 83.3 / 交互 70.0)
+
+===== Round 2 =====
+[generate] round2 写入 23 个文件 -> /app/output/baidu
+[eval] npm install @ /app/output/baidu
+[eval] npm run build
+[eval] baidu 总分 79.2 (视觉 79.6 / 功能 83.3 / 交互 70.0)
+[eval] npm install @ /app/output/baidu
+[eval] npm run build
+[eval] LLM 视觉评分 @ desktop ...
+[eval] LLM 视觉评分 @ mobile ...
+[eval] baidu 总分 79.2 (视觉 79.6 / 功能 83.3 / 交互 70.0)
+[report] 生成 /app/reports/baidu/report.md
+[run] 已恢复最佳轮 round0 为最终产物。
+
+[run] 完成。最佳分数: 79.2 (round0)
+[deliver] 已打包交付产物 → /app/deliverables/baidu

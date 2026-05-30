@@ -1,0 +1,33 @@
+{
+  "history": [
+    {
+      "round": 0,
+      "score": 80.2,
+      "dimensions": {
+        "visual": 50.6,
+        "functional": 100.0,
+        "interaction": 100.0
+      }
+    },
+    {
+      "round": 1,
+      "score": 77.9,
+      "dimensions": {
+        "visual": 44.7,
+        "functional": 100.0,
+        "interaction": 100.0
+      }
+    },
+    {
+      "round": 2,
+      "score": 79.4,
+      "dimensions": {
+        "visual": 48.6,
+        "functional": 100.0,
+        "interaction": 100.0
+      }
+    }
+  ],
+  "best_round": 0,
+  "best_score": 80.2
+}

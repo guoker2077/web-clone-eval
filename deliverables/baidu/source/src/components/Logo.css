@@ -1,0 +1,27 @@
+.logo {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  font-family: Arial, sans-serif;
+  font-weight: 700;
+  user-select: none;
+  margin-bottom: 22px;
+}
+
+.logo__bai {
+  font-size: 44px;
+  color: #2932e1;
+  letter-spacing: -1px;
+}
+
+.logo__du {
+  font-size: 44px;
+  color: #4e6ef2;
+  letter-spacing: -1px;
+}
+
+.logo__cn {
+  font-size: 44px;
+  color: #2932e1;
+  margin-left: 4px;
+}

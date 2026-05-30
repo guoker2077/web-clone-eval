@@ -1,26 +1,85 @@
 {
   "site_id": "github-login",
-  "score": 93.6,
+  "score": 95.1,
   "dimensions": {
-    "visual": 88.9,
+    "visual": 92.7,
     "functional": 100.0,
     "interaction": 90.0
   },
   "visual_detail": {
     "desktop": {
-      "ssim": 0.899,
-      "pixel_diff_ratio": 0.0396,
+      "ssim": 0.905,
+      "pixel_diff_ratio": 0.0395,
       "phash_distance": 8
+    }
+  },
+  "scoped_visual_detail": {
+    "desktop": {
+      "modules": {
+        "username": {
+          "ssim": 0.8678,
+          "pixel_diff_ratio": 0.1368,
+          "phash_distance": 0,
+          "present": true
+        },
+        "password": {
+          "ssim": 0.9954,
+          "pixel_diff_ratio": 0.0,
+          "phash_distance": 12,
+          "present": true
+        },
+        "submit-button": {
+          "ssim": 0.913,
+          "pixel_diff_ratio": 0.034,
+          "phash_distance": 12,
+          "present": true
+        },
+        "signup-link": {
+          "ssim": 1.0,
+          "pixel_diff_ratio": 0.0,
+          "phash_distance": 0,
+          "present": true
+        }
+      },
+      "aggregate": {
+        "ssim": 0.9441,
+        "pixel_diff_ratio": 0.0427,
+        "phash_distance": 6.0
+      },
+      "present": 4,
+      "total": 4
     }
   },
   "llm_visual": {
     "desktop": {
       "layout": 96,
-      "color": 88,
-      "typography": 90,
-      "components": 94,
-      "overall": 92,
-      "comment": "整体布局与组件高度还原，仅标题字重偏细、页脚链接颜色偏蓝有差异。"
+      "color": 95,
+      "typography": 94,
+      "components": 95,
+      "overall": 95,
+      "comment": "指定模块布局、配色与组件还原度高，几乎与原页一致",
+      "modules": [
+        {
+          "name": "Username or email address 输入框",
+          "score": 95,
+          "note": "位置、标签、宽度一致，仅缺少原页的聚焦蓝色边框态"
+        },
+        {
+          "name": "Password 输入框，type=password，上方有 Forgot password 链接",
+          "score": 96,
+          "note": "输入框与 Forgot password 链接位置、样式还原准确"
+        },
+        {
+          "name": "Sign in 登录按钮，绿色，整行宽度",
+          "score": 96,
+          "note": "绿色整行按钮，颜色与尺寸高度一致"
+        },
+        {
+          "name": "底部 Create an account 注册引导链接",
+          "score": 95,
+          "note": "文案与链接色一致，位置对齐良好"
+        }
+      ]
     }
   },
   "coverage": {
@@ -95,5 +154,26 @@
     "visual": 0.4,
     "functional": 0.4,
     "interaction": 0.2
+  },
+  "metric_nature": {
+    "deterministic": [
+      "ssim",
+      "pixel_diff_ratio",
+      "phash_distance",
+      "element_presence",
+      "behavior_pass",
+      "assert_pass"
+    ],
+    "non_deterministic": [
+      "llm_visual"
+    ],
+    "note": "确定性指标同输入必同输出、可复现；LLM 视觉分非确定，仅作辅助交叉验证。"
+  },
+  "cross_validation": {
+    "deterministic_visual": 92.7,
+    "llm_visual_avg": 95.0,
+    "delta": 2.3,
+    "agree": true,
+    "threshold": 15.0
   }
 }

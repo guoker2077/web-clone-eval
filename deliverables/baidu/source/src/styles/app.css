@@ -1,0 +1,49 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.main:not(.main--searched) {
+  padding-top: 90px;
+}
+
+.main--searched {
+  padding-top: 36px;
+  align-items: stretch;
+}
+
+.wenxin-banner {
+  margin: 26px auto 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #545970;
+  background: #f6f7fe;
+  border-radius: 18px;
+  padding: 8px 18px;
+}
+
+.wenxin-icon {
+  background: linear-gradient(135deg, #4e6ef2, #6a5cff);
+  color: #fff;
+  font-size: 12px;
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+
+.wenxin-arrow {
+  color: #9195a3;
+}

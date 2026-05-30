@@ -1,0 +1,140 @@
+.site-header {
+  border-bottom: 1px solid rgb(237, 238, 240);
+  background: rgb(255, 255, 255);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 56px;
+}
+
+.logo {
+  display: inline-flex;
+  align-items: baseline;
+  font-size: 24px;
+  font-weight: 700;
+  color: rgb(0, 0, 0);
+  letter-spacing: -0.5px;
+}
+
+.logo:hover {
+  text-decoration: none;
+}
+
+.logo-underscore {
+  color: rgb(4, 76, 159);
+}
+
+.main-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav-item {
+  position: relative;
+}
+
+.nav-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 16px;
+  color: rgb(0, 0, 0);
+  padding: 8px 10px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.nav-button:hover,
+.nav-button.active {
+  background: rgb(247, 247, 248);
+  text-decoration: none;
+}
+
+.chevron {
+  font-size: 10px;
+  color: rgb(81, 86, 93);
+}
+
+.nav-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 200px;
+  background: #fff;
+  border: 1px solid rgb(237, 238, 240);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  padding: 8px 0;
+  z-index: 200;
+}
+
+.nav-dropdown a {
+  display: block;
+  padding: 8px 16px;
+  color: rgb(0, 0, 0);
+  font-size: 15px;
+}
+
+.nav-dropdown a:hover {
+  background: rgb(247, 247, 248);
+  text-decoration: none;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.search-input {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 7px 12px;
+  border: 1px solid rgb(237, 238, 240);
+  border-radius: 6px;
+  background: rgb(247, 247, 248);
+  width: 180px;
+}
+
+.search-input:focus {
+  outline: 2px solid rgb(4, 76, 159);
+  background: #fff;
+}
+
+.theme-button,
+.lang-button {
+  background: none;
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-size: 14px;
+  color: rgb(0, 0, 0);
+  padding: 7px 10px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.theme-button:hover,
+.lang-button:hover {
+  background: rgb(247, 247, 248);
+}
+
+@media (max-width: 860px) {
+  .main-nav,
+  .search-input {
+    display: none;
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "site_id": "bing",
+  "url": "https://www.bing.com",
+  "viewports": {
+    "desktop": {
+      "colors": {
+        "text": [
+          "rgb(17, 17, 17)",
+          "rgb(0, 0, 0)",
+          "rgb(43, 43, 43)",
+          "rgb(255, 255, 255)",
+          "rgb(221, 221, 221)",
+          "rgba(255, 255, 255, 0.8)",
+          "rgb(76, 76, 76)",
+          "rgb(34, 34, 34)"
+        ],
+        "background": [
+          "rgb(85, 85, 85)",
+          "rgba(255, 255, 255, 0.7)",
+          "rgba(34, 34, 34, 0.9)",
+          "rgb(255, 255, 255)",
+          "rgb(236, 236, 236)"
+        ]
+      },
+      "fonts": {
+        "family": [
+          "\"Segoe UI\", Segoe, Tahoma, Arial, Verdana, sans-serif",
+          "Arial",
+          "\"Segoe UI\", Tahoma, Geneva, Verdana, sans-serif"
+        ],
+        "size": [
+          "16px",
+          "13px",
+          "12.8px",
+          "14px"
+        ]
+      },
+      "boxes": {
+        "search-input": {
+          "x": 342,
+          "y": 165,
+          "width": 474.109375,
+          "height": 42
+        },
+        "search-button": {
+          "x": 894.703125,
+          "y": 174.5,
+          "width": 29.296875,
+          "height": 23
+        }
+      },
+      "screenshot": "desktop.png"
+    }
+  }
+}

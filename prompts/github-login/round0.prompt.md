@@ -10,7 +10,7 @@
   - [empty-validation] (behavior) 不填任何内容直接点击登录，应有必填校验反馈（HTML5 required 或自定义提示）
 
 ## 原页视觉信息（供还原参考）
-- 主要文字色: ['rgb(31, 35, 40)', 'rgb(0, 0, 0)', 'rgb(37, 41, 46)', 'rgb(9, 105, 218)', 'rgb(255, 255, 255)', 'rgb(89, 99, 110)']
+- 主要文字色: ['rgb(31, 35, 40)', 'rgb(0, 0, 0)', 'rgb(37, 41, 46)', 'rgb(255, 255, 255)', 'rgb(9, 105, 218)', 'rgb(89, 99, 110)']
 - 主要背景色: ['rgb(255, 255, 255)', 'rgb(246, 248, 250)', 'rgb(31, 136, 61)']
 - 字体族: ['"Mona Sans VF", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"', 'sans-serif']
 - 字号: ['14px', '12px', '16px', '20px']
@@ -29,6 +29,12 @@
 - tsconfig.json 设 `"noUnusedLocals": false`、`"noUnusedParameters": false`，避免未使用变量导致失败。
 - 所有 import 必须真实存在；所有用到的变量/类型都要定义；不要留半成品代码。
 - React 18 写法，import 用 `import { useState } from 'react'`。
+
+## 样式必须真正生效（极重要，否则视觉全错）
+- 每个 `.css` 文件都必须被某个 `.tsx`/`.ts` 文件 `import`（如 `import './styles.css'`），
+  否则 Vite 不会打包它，页面退化成浏览器默认样式（label 与 input 挤同行、按钮变小、布局错乱）。
+- 不要生成"孤儿 CSS"：写了样式文件却没人 import。每写一个样式文件，就在对应组件顶部加上它的 import。
+- 不要写空的或只有注释的 CSS 文件来占位。
 
 ## 输出格式（严格遵守）
 对每个文件，先输出一行 `===FILE: 相对路径===`，紧接其完整内容。

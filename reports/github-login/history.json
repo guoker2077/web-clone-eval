@@ -2,14 +2,14 @@
   "history": [
     {
       "round": 0,
-      "score": 91.5,
+      "score": 95.1,
       "dimensions": {
-        "visual": 83.7,
+        "visual": 92.7,
         "functional": 100.0,
         "interaction": 90.0
       }
     }
   ],
   "best_round": 0,
-  "best_score": 91.5
+  "best_score": 95.1
 }

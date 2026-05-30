@@ -1,0 +1,177 @@
+{
+  "site_id": "bing",
+  "score": 67.5,
+  "dimensions": {
+    "visual": 58.6,
+    "functional": 75.0,
+    "interaction": 70.0
+  },
+  "visual_detail": {
+    "desktop": {
+      "ssim": 0.4239,
+      "pixel_diff_ratio": 0.7964,
+      "phash_distance": 32
+    }
+  },
+  "scoped_visual_detail": {
+    "desktop": {
+      "modules": {
+        "search-input": {
+          "ssim": 0.9935,
+          "pixel_diff_ratio": 0.0065,
+          "phash_distance": 2,
+          "present": true
+        },
+        "search-button": {
+          "ssim": 0.0677,
+          "pixel_diff_ratio": 0.2826,
+          "phash_distance": 32,
+          "present": true
+        }
+      },
+      "aggregate": {
+        "ssim": 0.5306,
+        "pixel_diff_ratio": 0.1446,
+        "phash_distance": 17.0
+      },
+      "present": 2,
+      "total": 2
+    }
+  },
+  "llm_visual": {
+    "desktop": {
+      "layout": 82,
+      "color": 80,
+      "typography": 81,
+      "components": 73,
+      "overall": 79,
+      "comment": "搜索框与按钮还原度高，结果区采用色块占位、结构相符，但翻页按钮缺失明显",
+      "modules": [
+        {
+          "name": "搜索输入框",
+          "score": 88,
+          "note": "居中白色输入框，位置与尺寸接近原页"
+        },
+        {
+          "name": "搜索提交按钮",
+          "score": 86,
+          "note": "右侧麦克风+放大镜图标布局一致"
+        },
+        {
+          "name": "搜索结果列表/结果文案区域",
+          "score": 78,
+          "note": "三栏卡片网格结构相符，但图片以纯色块占位、来源与标题排版基本还原"
+        },
+        {
+          "name": "结果列表下一页翻页按钮",
+          "score": 50,
+          "note": "复刻页未见明显翻页/下一页控件，该模块缺失"
+        }
+      ]
+    }
+  },
+  "coverage": {
+    "element_presence": 0.5,
+    "behavior_pass": 1.0,
+    "assert_pass": 1.0,
+    "detail": {
+      "el_ok": 2,
+      "el_total": 4,
+      "bh_ok": 2,
+      "bh_total": 2,
+      "assert_ok": 9,
+      "assert_total": 9
+    }
+  },
+  "behaviors": {
+    "features": {
+      "search-flow": {
+        "asserts": [
+          {
+            "step": "fill(search-input='天气')",
+            "ok": true
+          },
+          {
+            "step": "click(search-button)",
+            "ok": true
+          },
+          {
+            "step": "expect_visible(search-results)",
+            "ok": true
+          },
+          {
+            "step": "expect_text(search-results='天气')",
+            "ok": true
+          }
+        ],
+        "passed": 4,
+        "total": 4,
+        "ok": true
+      },
+      "pagination-flow": {
+        "asserts": [
+          {
+            "step": "fill(search-input='天气')",
+            "ok": true
+          },
+          {
+            "step": "click(search-button)",
+            "ok": true
+          },
+          {
+            "step": "expect_visible(search-results)",
+            "ok": true
+          },
+          {
+            "step": "click(next-page)",
+            "ok": true
+          },
+          {
+            "step": "expect_visible(search-results)",
+            "ok": true
+          }
+        ],
+        "passed": 5,
+        "total": 5,
+        "ok": true
+      }
+    },
+    "elements": {
+      "search-input": true,
+      "search-button": true,
+      "search-results": false,
+      "next-page": false
+    },
+    "states": {
+      "search-input": {
+        "focus_changes_style": false
+      }
+    }
+  },
+  "weights": {
+    "visual": 0.4,
+    "functional": 0.4,
+    "interaction": 0.2
+  },
+  "metric_nature": {
+    "deterministic": [
+      "ssim",
+      "pixel_diff_ratio",
+      "phash_distance",
+      "element_presence",
+      "behavior_pass",
+      "assert_pass"
+    ],
+    "non_deterministic": [
+      "llm_visual"
+    ],
+    "note": "确定性指标同输入必同输出、可复现；LLM 视觉分非确定，仅作辅助交叉验证。"
+  },
+  "cross_validation": {
+    "deterministic_visual": 58.6,
+    "llm_visual_avg": 79.0,
+    "delta": 20.4,
+    "agree": false,
+    "threshold": 15.0
+  }
+}

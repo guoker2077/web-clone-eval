@@ -1,0 +1,224 @@
+{
+  "name": "MDN <a> 元素文档页",
+  "type": "content",
+  "features": [
+    {
+      "id": "skip-to-content",
+      "desc": "顶部「Skip to main content」跳转链接",
+      "selector_hint": "a[href=\"#content\"], a",
+      "type": "element"
+    },
+    {
+      "id": "logo-home",
+      "desc": "顶部导航栏 MDN 站点 logo（返回首页链接）",
+      "selector_hint": "a[href=\"/en-US/\"], a",
+      "type": "element"
+    },
+    {
+      "id": "nav-html-menu",
+      "desc": "顶部导航栏「HTML」分类菜单按钮",
+      "selector_hint": "button[type=\"button\"]",
+      "type": "element"
+    },
+    {
+      "id": "nav-learn-menu",
+      "desc": "顶部导航栏「Learn」分类菜单按钮",
+      "selector_hint": "button[type=\"button\"]",
+      "type": "element"
+    },
+    {
+      "id": "nav-blog",
+      "desc": "顶部导航栏「Blog」链接",
+      "selector_hint": "a[href=\"/en-US/blog/\"], a",
+      "type": "element"
+    },
+    {
+      "id": "breadcrumb-web",
+      "desc": "面包屑导航「Web」链接",
+      "selector_hint": "a[href=\"/en-US/docs/Web\"], a",
+      "type": "element"
+    },
+    {
+      "id": "breadcrumb-html",
+      "desc": "面包屑导航「HTML」链接",
+      "selector_hint": "a[href=\"/en-US/docs/Web/HTML\"], a",
+      "type": "element"
+    },
+    {
+      "id": "breadcrumb-reference",
+      "desc": "面包屑导航「Reference」链接",
+      "selector_hint": "a[href=\"/en-US/docs/Web/HTML/Reference\"], a",
+      "type": "element"
+    },
+    {
+      "id": "breadcrumb-elements",
+      "desc": "面包屑导航「Elements」链接",
+      "selector_hint": "a[href=\"/en-US/docs/Web/HTML/Reference/Elements\"], a",
+      "type": "element"
+    },
+    {
+      "id": "breadcrumb-anchor",
+      "desc": "面包屑导航当前页「<a>」链接",
+      "selector_hint": "a[href=\"/en-US/docs/Web/HTML/Reference/Elements/a\"], a",
+      "type": "element"
+    },
+    {
+      "id": "toc-try-it",
+      "desc": "右侧 On this page 大纲「Try it」锚点",
+      "selector_hint": "a[href=\"#try_it\"], a",
+      "type": "element"
+    },
+    {
+      "id": "toc-attributes",
+      "desc": "右侧大纲「Attributes」锚点",
+      "selector_hint": "a[href=\"#attributes\"], a",
+      "type": "element"
+    },
+    {
+      "id": "toc-accessibility",
+      "desc": "右侧大纲「Accessibility」锚点",
+      "selector_hint": "a[href=\"#accessibility\"], a",
+      "type": "element"
+    },
+    {
+      "id": "toc-examples",
+      "desc": "右侧大纲「Examples」锚点",
+      "selector_hint": "a[href=\"#examples\"], a",
+      "type": "element"
+    },
+    {
+      "id": "toc-security-privacy",
+      "desc": "右侧大纲「Security and privacy」锚点",
+      "selector_hint": "a[href=\"#security_and_privacy\"], a",
+      "type": "element"
+    },
+    {
+      "id": "toc-technical-summary",
+      "desc": "右侧大纲「Technical summary」锚点",
+      "selector_hint": "a[href=\"#technical_summary\"], a",
+      "type": "element"
+    },
+    {
+      "id": "toc-specifications",
+      "desc": "右侧大纲「Specifications」锚点",
+      "selector_hint": "a[href=\"#specifications\"], a",
+      "type": "element"
+    },
+    {
+      "id": "toc-browser-compatibility",
+      "desc": "右侧大纲「Browser compatibility」锚点",
+      "selector_hint": "a[href=\"#browser_compatibility\"], a",
+      "type": "element"
+    },
+    {
+      "id": "toc-see-also",
+      "desc": "右侧大纲「See also」锚点",
+      "selector_hint": "a[href=\"#see_also\"], a",
+      "type": "element"
+    },
+    {
+      "id": "content-global-attributes",
+      "desc": "正文中「global attributes」链接",
+      "selector_hint": "a[href=\"/en-US/docs/Web/HTML/Reference/Global_attributes\"], a",
+      "type": "element"
+    },
+    {
+      "id": "content-attr-download",
+      "desc": "Attributes 章节内「download」属性锚点链接",
+      "selector_hint": "a[href=\"#download\"], a",
+      "type": "element"
+    },
+    {
+      "id": "content-attr-hreflang",
+      "desc": "Attributes 章节内「hreflang」属性锚点链接",
+      "selector_hint": "a[href=\"#hreflang\"], a",
+      "type": "element"
+    },
+    {
+      "id": "header-visible",
+      "desc": "校验顶部导航栏关键元素渲染可见",
+      "type": "behavior",
+      "steps": [
+        {
+          "action": "expect_visible",
+          "target": "logo-home"
+        },
+        {
+          "action": "expect_visible",
+          "target": "nav-blog"
+        }
+      ]
+    },
+    {
+      "id": "breadcrumb-check",
+      "desc": "校验面包屑层级与当前页标识",
+      "type": "behavior",
+      "steps": [
+        {
+          "action": "expect_visible",
+          "target": "breadcrumb-web"
+        },
+        {
+          "action": "expect_text",
+          "target": "breadcrumb-anchor",
+          "value": "<a>"
+        }
+      ]
+    },
+    {
+      "id": "toc-jump-attributes",
+      "desc": "点击右侧大纲 Attributes 锚点后定位到属性章节内容",
+      "type": "behavior",
+      "steps": [
+        {
+          "action": "click",
+          "target": "toc-attributes"
+        },
+        {
+          "action": "expect_visible",
+          "target": "content-attr-download"
+        },
+        {
+          "action": "expect_visible",
+          "target": "content-attr-hreflang"
+        }
+      ]
+    },
+    {
+      "id": "toc-content-check",
+      "desc": "校验右侧本页大纲条目文本",
+      "type": "behavior",
+      "steps": [
+        {
+          "action": "expect_text",
+          "target": "toc-specifications",
+          "value": "Specifications"
+        },
+        {
+          "action": "expect_text",
+          "target": "toc-see-also",
+          "value": "See also"
+        }
+      ]
+    }
+  ],
+  "masks": [
+    "iframe",
+    ".interactive-example",
+    ".bc-table"
+  ],
+  "notes": "内容展示型页面，重点还原顶栏/面包屑/正文/右侧大纲的版式与层级，断言集中在链接可见性与文本一致性，动态的 Try it 交互区与浏览器兼容表已 mask。",
+  "id": "mdn-doc",
+  "url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/a",
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1280,
+      "height": 800
+    }
+  ],
+  "wait": {
+    "until": "networkidle",
+    "extra_ms": 1500
+  }
+}
