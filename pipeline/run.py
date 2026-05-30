@@ -161,8 +161,20 @@ def run(site_id: str, max_rounds: int, threshold: float, skip_capture: bool,
                 "history": history, "failed": True}
 
     print(f"\n[run] 完成。最佳分数: {best['score']} (round{best_round})")
+
+    # 打包可独立运行的交付产物（干净源码 + 已构建 dist + 站点 README）。
+    # 此时 output/<site> 已是最佳轮且 dist 为其构建产物，可直接打包。
+    deliver_dir = None
+    try:
+        from deliver import package_deliverable
+        deliver_dir = str(package_deliverable(site_id))
+    except Exception as e:  # noqa: BLE001
+        # 打包失败不该让整个闭环判负（产物/报告已生成），仅告警。
+        print(f"[run] ⚠️ 交付产物打包失败（不影响评估结果）: {e}")
+        progress("refining", f"交付打包失败: {str(e)[:120]}")
+
     return {"best_score": best["score"], "best_round": best_round,
-            "history": history, "failed": False}
+            "history": history, "failed": False, "deliverable": deliver_dir}
 
 
 if __name__ == "__main__":

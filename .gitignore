@@ -15,6 +15,11 @@ node_modules/
 dist/
 .vite/
 
+# 交付产物（复刻成果）：deliverables/<site>/dist 是「可独立运行的静态产物」，
+# 需随仓库提交，故覆盖上面的全局 dist/ 忽略（source/ 已不含 node_modules）。
+!deliverables/**/dist/
+!deliverables/**/dist/**
+
 # Playwright
 .playwright/
 playwright-report/

@@ -28,6 +28,8 @@ x-common: &common
     - ./output:/app/output
     - ./reports:/app/reports
     - ./prompts:/app/prompts
+    # 交付产物（干净源码 + 已构建 dist + README）：随仓库提交的复刻成果
+    - ./deliverables:/app/deliverables
     # scopes 双向挂载：宿主机新增/合成的 scope 立即对容器可见
     - ./scopes:/app/scopes
     # 队列 DB + worker 日志：web 与 worker 共享，故放独立 data 卷
