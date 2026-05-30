@@ -48,7 +48,8 @@ def render(site_id: str) -> Path:
             "",
             "## LLM 辅助视觉评分（交叉验证，不计入主总分）",
             "",
-            "> 让 Claude 视觉模型同时看原页与复刻页，按 rubric 打分。"
+            "> 让 Claude 视觉模型同时看原页与复刻页，按 rubric 打分。评分已对齐"
+            "复刻范围：只评 scope 声明的模块，范围外内容缺失不扣分。"
             "因 LLM 评分非确定性，仅作辅助信号与上方确定性指标交叉验证。",
             "",
             "| 视口 | 布局 | 配色 | 排版 | 组件 | 总评 | 点评 |",
@@ -63,6 +64,25 @@ def render(site_id: str) -> Path:
                     f"{s.get('typography','-')} | {s.get('components','-')} | "
                     f"**{s.get('overall','-')}** | {s.get('comment','')} |"
                 )
+
+        # 逐模块小分（范围对齐 rubric 产出）：定位哪个声明模块没还原好
+        mod_lines: list[str] = []
+        for vp, s in llm_visual.items():
+            for m in (s.get("modules") or []):
+                if not isinstance(m, dict):
+                    continue
+                mod_lines.append(
+                    f"| {vp} | {m.get('name','-')} | "
+                    f"**{m.get('score','-')}** | {m.get('note','')} |")
+        if mod_lines:
+            lines += [
+                "",
+                "### 逐模块还原度（复刻范围内）",
+                "",
+                "| 视口 | 模块 | 得分 | 说明 |",
+                "| --- | --- | --- | --- |",
+                *mod_lines,
+            ]
 
     lines += ["", "## 功能覆盖", ""]
     cov = result["coverage"]["detail"]

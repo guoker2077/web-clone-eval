@@ -16,7 +16,7 @@ from playwright.sync_api import sync_playwright
 
 import metrics_visual as mv
 from metrics_behavior import coverage_score, run_behaviors
-from metrics_llm import llm_visual_score
+from metrics_llm import llm_visual_score, scope_modules
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -171,14 +171,16 @@ def evaluate(scope: dict, use_llm: bool = True) -> dict:
 
     # LLM 辅助视觉评分（加分项，非确定性）：逐视口让模型交叉验证，
     # 不计入主总分，仅作辅助信号在报告中并列展示。
+    # 传入复刻范围内的可见模块 → 范围对齐评分（范围外缺失不扣分 + 逐模块小分）。
     llm_visual: dict = {}
     if use_llm:
+        modules = scope_modules(scope)
         for vp in scope["viewports"]:
             name = vp["name"]
             ref_png = cap_dir / f"{name}.png"
             clone_png = Path(clone_shots[name])
             print(f"[eval] LLM 视觉评分 @ {name} ...")
-            llm_visual[name] = llm_visual_score(ref_png, clone_png)
+            llm_visual[name] = llm_visual_score(ref_png, clone_png, modules)
 
     result = {
         "site_id": site_id,
