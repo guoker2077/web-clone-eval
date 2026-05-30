@@ -25,6 +25,35 @@ WEIGHTS = {"visual": 0.4, "functional": 0.4, "interaction": 0.2}
 # 视觉子指标权重
 VISUAL_WEIGHTS = {"ssim": 0.4, "pixel": 0.2, "phash": 0.15, "color": 0.25}
 
+# 交叉验证一致性阈值：两种独立方法（确定性 vs LLM）视觉分差距 ≤ 此值判「一致」
+CROSS_AGREE_DELTA = 15.0
+
+
+def cross_validation(det_visual: float, llm_visual: dict) -> dict | None:
+    """确定性视觉分 vs LLM 视觉分的交叉验证。
+
+    可置信的核心不是给单次确定性计算编个「置信度」（那是假精度——SSIM 等是
+    精确计算，无采样误差），而是用两种独立方法相互印证：
+      - 确定性：SSIM/像素差/pHash，可复现、无随机性
+      - LLM：视觉模型按 rubric 打分，非确定性、独立视角
+    二者接近 → 结论可信；差距大 → 标「存疑」，提示人工复核。返回 None 表示
+    LLM 分缺失（无从交叉验证）。
+    """
+    overalls = [s["overall"] for s in llm_visual.values()
+                if isinstance(s, dict) and not s.get("error")
+                and isinstance(s.get("overall"), (int, float))]
+    if not overalls:
+        return None
+    llm_avg = sum(overalls) / len(overalls)
+    delta = abs(det_visual - llm_avg)
+    return {
+        "deterministic_visual": round(det_visual, 1),
+        "llm_visual_avg": round(llm_avg, 1),
+        "delta": round(delta, 1),
+        "agree": delta <= CROSS_AGREE_DELTA,
+        "threshold": CROSS_AGREE_DELTA,
+    }
+
 
 def _free_port() -> int:
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
@@ -195,6 +224,15 @@ def evaluate(scope: dict, use_llm: bool = True) -> dict:
         "coverage": cov,
         "behaviors": behaviors,
         "weights": WEIGHTS,
+        # 可置信度元信息：标注各指标性质（可复现 / 非确定）+ 两法交叉验证
+        "metric_nature": {
+            "deterministic": ["ssim", "pixel_diff_ratio", "phash_distance",
+                              "element_presence", "behavior_pass", "assert_pass"],
+            "non_deterministic": ["llm_visual"],
+            "note": "确定性指标同输入必同输出、可复现；LLM 视觉分非确定，仅作辅助交叉验证。",
+        },
+        "cross_validation": cross_validation(
+            round(visual_score * 100, 1), llm_visual),
     }
     (rep_dir / "eval.json").write_text(
         json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"

@@ -25,21 +25,45 @@ def render(site_id: str) -> Path:
         f"- 复刻类型：{scope.get('type','-')}",
         f"- **综合得分：{result['score']} / 100**",
         "",
+        "> 度量可置信性说明：标注 `确定性` 的指标（SSIM/像素差/pHash/各覆盖率）"
+        "为精确计算，同一输入必得同一结果、可复现；标注 `非确定` 的 LLM 视觉分"
+        "为辅助信号，不计入主总分，仅用于与确定性指标交叉验证（见下文）。"
+        "所有比率均附原始计数（分子/分母），便于核对。",
+        "",
         "## 维度得分",
         "",
-        "| 维度 | 得分 | 权重 |  |",
-        "| --- | --- | --- | --- |",
-        f"| 视觉一致性 | {d['visual']} | {result['weights']['visual']} | `{_bar(d['visual'])}` |",
-        f"| 功能一致性 | {d['functional']} | {result['weights']['functional']} | `{_bar(d['functional'])}` |",
-        f"| 交互一致性 | {d['interaction']} | {result['weights']['interaction']} | `{_bar(d['interaction'])}` |",
+        "| 维度 | 得分 | 权重 | 性质 |  |",
+        "| --- | --- | --- | --- | --- |",
+        f"| 视觉一致性 | {d['visual']} | {result['weights']['visual']} | 确定性·可复现 | `{_bar(d['visual'])}` |",
+        f"| 功能一致性 | {d['functional']} | {result['weights']['functional']} | 确定性·可复现 | `{_bar(d['functional'])}` |",
+        f"| 交互一致性 | {d['interaction']} | {result['weights']['interaction']} | 确定性·可复现 | `{_bar(d['interaction'])}` |",
         "",
-        "## 视觉指标明细（逐视口）",
+        "## 视觉指标明细（逐视口，确定性·可复现）",
         "",
         "| 视口 | SSIM↑ | 像素差异率↓ | pHash距离↓ |",
         "| --- | --- | --- | --- |",
     ]
     for vp, m in result["visual_detail"].items():
         lines.append(f"| {vp} | {m['ssim']} | {m['pixel_diff_ratio']} | {m['phash_distance']} |")
+
+    # 交叉验证：两种独立方法（确定性 vs LLM）的视觉分是否相互印证
+    cv = result.get("cross_validation")
+    if cv:
+        verdict = ("✅ 一致——两种独立方法结论吻合，视觉评分可信"
+                   if cv["agree"] else
+                   "⚠️ 存疑——两法差距偏大，建议人工复核视觉评分")
+        lines += [
+            "",
+            "## 交叉验证（可置信度）",
+            "",
+            "> 用两种**独立**方法测同一对象，相互印证：确定性指标（SSIM 等，可复现）"
+            "与 LLM 视觉分（非确定，独立视角）。二者接近则结论可信。",
+            "",
+            f"- 确定性视觉分：**{cv['deterministic_visual']}**",
+            f"- LLM 视觉分（均值）：**{cv['llm_visual_avg']}**",
+            f"- 差距：**{cv['delta']}**（阈值 {cv['threshold']}）",
+            f"- 判定：{verdict}",
+        ]
 
     # LLM 辅助视觉评分（加分项，与确定性指标交叉验证，不计入主总分）
     llm_visual = result.get("llm_visual") or {}
@@ -84,11 +108,16 @@ def render(site_id: str) -> Path:
                 *mod_lines,
             ]
 
-    lines += ["", "## 功能覆盖", ""]
+    lines += ["", "## 功能覆盖（确定性·可复现）", ""]
     cov = result["coverage"]["detail"]
-    lines.append(f"- 元素存在率：{cov['el_ok']}/{cov['el_total']}")
-    lines.append(f"- 行为通过率：{cov['bh_ok']}/{cov['bh_total']} 个功能点全通过")
-    lines.append(f"- 断言通过率：{cov['assert_ok']}/{cov['assert_total']} 条断言")
+
+    def _rate(ok: int, total: int) -> str:
+        pct = round(ok / total * 100, 1) if total else 100.0
+        return f"{ok}/{total}（{pct}%）"
+
+    lines.append(f"- 元素存在率：{_rate(cov['el_ok'], cov['el_total'])}")
+    lines.append(f"- 行为通过率：{_rate(cov['bh_ok'], cov['bh_total'])} 个功能点全通过")
+    lines.append(f"- 断言通过率：{_rate(cov['assert_ok'], cov['assert_total'])} 条断言")
 
     lines += ["", "### 交互断言明细", ""]
     for fid, fb in result["behaviors"]["features"].items():
