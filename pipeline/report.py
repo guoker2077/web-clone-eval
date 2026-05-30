@@ -38,7 +38,36 @@ def render(site_id: str) -> Path:
         f"| 功能一致性 | {d['functional']} | {result['weights']['functional']} | 确定性·可复现 | `{_bar(d['functional'])}` |",
         f"| 交互一致性 | {d['interaction']} | {result['weights']['interaction']} | 确定性·可复现 | `{_bar(d['interaction'])}` |",
         "",
-        "## 视觉指标明细（逐视口，确定性·可复现）",
+        "## 视觉指标明细（确定性·可复现）",
+        "",
+        "### 范围对齐：逐声明模块裁剪比对（主分依据）",
+        "",
+        "> 只比对 scope 声明的模块区域（原页 box 来自 capture，复刻页来自 "
+        "data-testid），避免整页比对被范围外内容拉低。",
+        "",
+        "| 视口 | 模块 | SSIM↑ | 像素差异率↓ | pHash距离↓ | 状态 |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    scoped = result.get("scoped_visual_detail") or {}
+    for vp, sv in scoped.items():
+        for fid, m in sv.get("modules", {}).items():
+            if not m.get("present"):
+                lines.append(f"| {vp} | {fid} | — | — | — | ❌ 缺失/不可比 |")
+            else:
+                lines.append(
+                    f"| {vp} | {fid} | {m['ssim']} | {m['pixel_diff_ratio']} "
+                    f"| {m['phash_distance']} | ✓ |")
+        agg = sv.get("aggregate", {})
+        lines.append(
+            f"| {vp} | **聚合({sv.get('present',0)}/{sv.get('total',0)})** "
+            f"| **{agg.get('ssim','-')}** | **{agg.get('pixel_diff_ratio','-')}** "
+            f"| **{agg.get('phash_distance','-')}** | — |")
+
+    lines += [
+        "",
+        "### 整页比对（参考，不作主分）",
+        "",
+        "> 含范围外内容，仅留档对照；对部分复刻天然偏低，不代表复刻质量。",
         "",
         "| 视口 | SSIM↑ | 像素差异率↓ | pHash距离↓ |",
         "| --- | --- | --- | --- |",

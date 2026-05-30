@@ -132,3 +132,82 @@ def bbox_iou(box_a: dict, box_b: dict) -> float:
     inter = iw * ih
     union = box_a["width"] * box_a["height"] + box_b["width"] * box_b["height"] - inter
     return float(inter / union) if union > 0 else 0.0
+
+
+def _crop(path: str, box: dict) -> "np.ndarray | None":
+    """按 box(x,y,width,height) 从整页截图裁出区域，返回 RGB 数组；越界裁剪到边界。"""
+    img = _load_rgb(path)
+    h, w = img.shape[:2]
+    x1 = max(0, int(box["x"]))
+    y1 = max(0, int(box["y"]))
+    x2 = min(w, int(box["x"] + box["width"]))
+    y2 = min(h, int(box["y"] + box["height"]))
+    if x2 - x1 < 2 or y2 - y1 < 2:
+        return None
+    return img[y1:y2, x1:x2]
+
+
+def _region_scores(ref_crop: np.ndarray, cand_crop: np.ndarray) -> dict:
+    """对两块已裁剪区域算 SSIM/像素差/pHash（统一缩放到同尺寸）。"""
+    h = min(ref_crop.shape[0], cand_crop.shape[0])
+    w = min(ref_crop.shape[1], cand_crop.shape[1])
+    scale = min(1.0, 512 / max(h, w))
+    size = (max(1, int(w * scale)), max(1, int(h * scale)))
+    a = cv2.resize(ref_crop, size, interpolation=cv2.INTER_AREA)
+    b = cv2.resize(cand_crop, size, interpolation=cv2.INTER_AREA)
+    ag = cv2.cvtColor(a, cv2.COLOR_RGB2GRAY)
+    bg = cv2.cvtColor(b, cv2.COLOR_RGB2GRAY)
+    # 小图 SSIM 需保证 win_size 为奇数且 ≤ 短边
+    win = min(7, ag.shape[0], ag.shape[1])
+    if win % 2 == 0:
+        win -= 1
+    ssim_v = float(ssim(ag, bg, win_size=win)) if win >= 3 else 0.0
+    diff = np.abs(a.astype(np.int16) - b.astype(np.int16)).max(axis=2)
+    pix = float((diff > 30).mean())
+    pa = imagehash.phash(Image.fromarray(a))
+    pb = imagehash.phash(Image.fromarray(b))
+    return {"ssim": round(ssim_v, 4),
+            "pixel_diff_ratio": round(pix, 4),
+            "phash_distance": int(pa - pb)}
+
+
+def scoped_visual(ref_png: str, cand_png: str,
+                  ref_boxes: dict, cand_boxes: dict) -> dict:
+    """逐声明模块裁剪比对的范围对齐视觉度量。
+
+    只比对 scope 声明的元素区域（原页 box 来自 capture，复刻页 box 来自 data-testid），
+    避免整页比对被范围外内容（壁纸/资讯流/页脚）拉低。返回：
+      {modules: {fid: {ssim,pixel_diff_ratio,phash_distance,present}},
+       aggregate: {ssim,pixel_diff_ratio,phash_distance},  # 仅对双方都存在的模块求均值
+       present, total}
+    缺失模块（复刻页无对应 box）计入 total 但不进 aggregate，另由 present/total 反映覆盖。
+    """
+    modules: dict = {}
+    rows = []
+    for fid, rbox in ref_boxes.items():
+        cbox = cand_boxes.get(fid)
+        if not cbox:
+            modules[fid] = {"present": False}
+            continue
+        rc = _crop(ref_png, rbox)
+        cc = _crop(cand_png, cbox)
+        if rc is None or cc is None:
+            modules[fid] = {"present": False}
+            continue
+        s = _region_scores(rc, cc)
+        s["present"] = True
+        modules[fid] = s
+        rows.append(s)
+
+    total = len(ref_boxes)
+    present = len(rows)
+    if rows:
+        agg = {
+            "ssim": round(sum(r["ssim"] for r in rows) / present, 4),
+            "pixel_diff_ratio": round(sum(r["pixel_diff_ratio"] for r in rows) / present, 4),
+            "phash_distance": round(sum(r["phash_distance"] for r in rows) / present, 1),
+        }
+    else:
+        agg = {"ssim": 0.0, "pixel_diff_ratio": 1.0, "phash_distance": 32.0}
+    return {"modules": modules, "aggregate": agg,
+            "present": present, "total": total}

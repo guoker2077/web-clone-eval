@@ -110,9 +110,17 @@ def serve(dist: Path, port: int) -> subprocess.Popen:
     return proc
 
 
-def screenshot_clone(url: str, scope: dict, out_dir: Path) -> dict:
-    """对复刻页按相同视口截图，遮罩同样区域。返回 {viewport: png_path}。"""
-    shots = {}
+def screenshot_clone(url: str, scope: dict, out_dir: Path) -> tuple[dict, dict]:
+    """对复刻页按相同视口截图，并抓取声明模块的 bounding box（用于范围对齐视觉比对）。
+
+    返回 (shots, boxes)：
+      shots: {viewport: png_path}
+      boxes: {viewport: {feature_id: {x,y,width,height}}}  复刻页元素以 data-testid 定位
+    """
+    shots: dict = {}
+    boxes: dict = {}
+    feat_ids = [f["id"] for f in scope.get("features", [])
+                if f.get("type", "element") == "element"]
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
         for vp in scope["viewports"]:
@@ -126,9 +134,21 @@ def screenshot_clone(url: str, scope: dict, out_dir: Path) -> dict:
             png = out_dir / f"clone_{vp['name']}.png"
             page.screenshot(path=str(png), full_page=True)
             shots[vp["name"]] = str(png)
+            vp_boxes: dict = {}
+            for fid in feat_ids:
+                try:
+                    loc = page.locator(f'[data-testid="{fid}"]').first
+                    if loc.count() == 0:
+                        continue
+                    box = loc.bounding_box()
+                    if box and box["width"] > 1 and box["height"] > 1:
+                        vp_boxes[fid] = box
+                except Exception:  # noqa: BLE001
+                    continue
+            boxes[vp["name"]] = vp_boxes
             ctx.close()
         browser.close()
-    return shots
+    return shots, boxes
 
 
 def evaluate(scope: dict, use_llm: bool = True) -> dict:
@@ -145,37 +165,44 @@ def evaluate(scope: dict, use_llm: bool = True) -> dict:
     proc = serve(dist, port)
     clone_url = f"http://127.0.0.1:{port}/"
     try:
-        clone_shots = screenshot_clone(clone_url, scope, rep_dir)
+        clone_shots, clone_boxes = screenshot_clone(clone_url, scope, rep_dir)
 
-        # 2) 视觉指标（逐视口）
+        # 2) 视觉指标（逐视口）：范围对齐为主、整页为参考
+        #    整页比对会被范围外内容（壁纸/资讯流/页脚）拉低，不公平；故主分用
+        #    逐声明模块裁剪比对（scoped），整页指标仅作参考留档。
         visual_per_vp = {}
+        scoped_per_vp = {}
         for vp in scope["viewports"]:
             name = vp["name"]
             ref = str(cap_dir / f"{name}.png")
             cand = clone_shots[name]
-            ssim_v = mv.ssim_score(ref, cand)
-            pix = mv.pixel_diff_ratio(ref, cand)
-            ph = mv.phash_distance(ref, cand)
-            ref_colors = (cap_meta["viewports"][name]["colors"]["text"]
-                          + cap_meta["viewports"][name]["colors"]["background"])
-            # 复刻页配色：临时抓一次（简化：复用截图主色由 phash/ssim 间接覆盖，
-            # 这里用原页色板与复刻页色板对比需复刻页 meta，留待 refine 增强）
+            # 整页（参考）
             visual_per_vp[name] = {
-                "ssim": round(ssim_v, 4),
-                "pixel_diff_ratio": round(pix, 4),
-                "phash_distance": ph,
+                "ssim": round(mv.ssim_score(ref, cand), 4),
+                "pixel_diff_ratio": round(mv.pixel_diff_ratio(ref, cand), 4),
+                "phash_distance": mv.phash_distance(ref, cand),
             }
+            # 范围对齐（主分）：原页 box 来自 capture，复刻页 box 来自 data-testid
+            ref_boxes = cap_meta["viewports"][name].get("boxes", {})
+            scoped_per_vp[name] = mv.scoped_visual(
+                ref, cand, ref_boxes, clone_boxes.get(name, {}))
 
-        # 视觉分：聚合各视口，归一到 0-1
-        ssim_avg = sum(v["ssim"] for v in visual_per_vp.values()) / len(visual_per_vp)
-        pix_avg = sum(v["pixel_diff_ratio"] for v in visual_per_vp.values()) / len(visual_per_vp)
-        ph_avg = sum(v["phash_distance"] for v in visual_per_vp.values()) / len(visual_per_vp)
-        visual_score = (
-            VISUAL_WEIGHTS["ssim"] * max(0, ssim_avg)
-            + VISUAL_WEIGHTS["pixel"] * (1 - min(1, pix_avg))
-            + VISUAL_WEIGHTS["phash"] * (1 - min(1, ph_avg / 32))
-            + VISUAL_WEIGHTS["color"] * max(0, ssim_avg)  # 色彩占位用 ssim 兜底
-        )
+        # 视觉分：优先用范围对齐聚合；若某视口无可比模块则该视口回退整页指标
+        def _vp_visual(name: str) -> float:
+            sc = scoped_per_vp[name]
+            src = sc["aggregate"] if sc["present"] > 0 else visual_per_vp[name]
+            ssim_v = src["ssim"]
+            pix = src["pixel_diff_ratio"]
+            ph = src["phash_distance"]
+            return (
+                VISUAL_WEIGHTS["ssim"] * max(0, ssim_v)
+                + VISUAL_WEIGHTS["pixel"] * (1 - min(1, pix))
+                + VISUAL_WEIGHTS["phash"] * (1 - min(1, ph / 32))
+                + VISUAL_WEIGHTS["color"] * max(0, ssim_v)  # 色彩占位用 ssim 兜底
+            )
+
+        visual_score = sum(_vp_visual(vp["name"]) for vp in scope["viewports"]) \
+            / len(scope["viewports"])
 
         # 3) 功能 + 交互指标
         behaviors = run_behaviors(clone_url, scope)
@@ -220,6 +247,7 @@ def evaluate(scope: dict, use_llm: bool = True) -> dict:
             "interaction": round(interaction_score * 100, 1),
         },
         "visual_detail": visual_per_vp,
+        "scoped_visual_detail": scoped_per_vp,
         "llm_visual": llm_visual,
         "coverage": cov,
         "behaviors": behaviors,
