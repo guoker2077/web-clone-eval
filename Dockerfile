@@ -57,7 +57,10 @@ RUN groupadd -g 1000 app && useradd -u 1000 -g 1000 -m -s /bin/bash app \
     && chown -R app:app /app /home/app
 
 ENV HOME=/home/app \
-    NPM_CONFIG_CACHE=/home/app/.npm
+    NPM_CONFIG_CACHE=/home/app/.npm \
+    # 关掉 stdout 块缓冲：非 TTY（docker logs 管道）下 print 不及时刷新，
+    # 会让 worker 启动/进度日志「消失」直到缓冲填满。统一行缓冲，日志即时可见。
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app/pipeline
 
