@@ -44,6 +44,9 @@ RUN playwright install --with-deps chromium \
 COPY pipeline/ ./pipeline/
 COPY scopes/ ./scopes/
 COPY server/ ./server/
+# 一键单测：离线、确定、秒级的核心逻辑测试（不联网、不调 API），随镜像分发
+COPY tests/ ./tests/
+COPY pytest.ini ./pytest.ini
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 

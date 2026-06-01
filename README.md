@@ -304,7 +304,20 @@ python evaluate.py <site>             # 单独跑构建+评估
 python report.py <site>               # 渲染报告
 ```
 
-## 新增一个复刻页面
+## 一键测试
+
+核心逻辑单测——**离线、确定、秒级、零成本**（不联网、不调 Claude API、不需要 token），
+覆盖可置信指标的可复现性、交叉验证判定、功能覆盖率、范围对齐 rubric、SSRF 防御、
+以及队列的并发认领原子性（背书并发执行的正确性）：
+
+```bash
+docker compose run --rm test          # 一键跑全部单测（推荐）
+# 或本地：pip install -r requirements.txt && pytest
+```
+
+> 设计分层：把「调模型/联网」的慢且不确定的部分隔离在单测之外（用 `check_api.py`
+> 与提交一个真实 job 做手动冒烟），单测只覆盖纯逻辑，故可放进 CI 反复跑。
+> 测试代码见 `tests/unit/`，约 44 个用例 1~2 秒跑完。
 
 ### 方式 A：自动合成 scope（推荐，最小输入）
 

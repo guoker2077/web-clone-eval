@@ -47,6 +47,13 @@ services:
     ports:
       - "8080:8080"   # 预览复刻产物时用 --service-ports 暴露
 
+  # 一键单测：离线、确定、秒级的核心逻辑测试（不联网、不调 Claude API、零成本）。
+  # 跑法：docker compose run --rm test
+  test:
+    <<: *common
+    working_dir: /app
+    command: ["python", "-m", "pytest"]
+
   # ② 云端 API + UI（无状态，提交任务、查询进度、预览产物）
   web:
     <<: *common
