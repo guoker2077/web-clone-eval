@@ -86,6 +86,9 @@ services:
       JOB_FSIZE_MB: "512"
       JOB_NPROC: "512"
       JOB_TIMEOUT_SEC: "1800"
+      # 单 worker 进程内并行跑几条 job。受内存约束：每条 job 峰值约 1~1.5GB
+      # （Chromium+npm），16G 机器建议 4~6，2核4G 建议 2。默认 2。
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
       SANDBOX_MODE: ${SANDBOX_MODE:-subprocess}
     command: >
       python -m server.worker

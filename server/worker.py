@@ -17,6 +17,7 @@ import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -28,6 +29,14 @@ from server import jobstore  # noqa: E402
 
 POLL_INTERVAL = float(os.environ.get("WORKER_POLL_SEC", "2.0"))
 JOB_TIMEOUT = float(os.environ.get("JOB_TIMEOUT_SEC", "1800"))  # 单 job 墙钟上限
+
+# 并发度：单 worker 进程内并行跑几条 job。每条 job 各跑一条「认领→执行」循环，
+# 靠 jobstore.claim_next 的 BEGIN IMMEDIATE 原子认领保证不重复领同一条。
+# 默认 1（与历史串行行为一致）。提高它即获得真并发——重活（npm/chromium）都在
+# 子进程里，worker 线程只阻塞在 proc.wait()（释放 GIL），故线程即可实现真并行。
+# 上限取决于内存：每条 job 峰值约 1~1.5GB（Chromium + npm 构建），16G 机器建议
+# 4~6，2核4G 建议 2。设过高会触发 swap 反而更慢。
+WORKER_CONCURRENCY = max(1, int(os.environ.get("WORKER_CONCURRENCY", "1")))
 
 # 沙箱模式：subprocess（默认，本地骨架）| docker（每 job 一次性容器，强隔离）
 SANDBOX_MODE = os.environ.get("SANDBOX_MODE", "subprocess").lower()
@@ -117,6 +126,22 @@ def _run_one(job: dict) -> None:
                             error=f"runner 退出码 {rc}，未落终态")
 
 
+def _claim_loop(worker_id: str, slot: int, stop: dict) -> None:
+    """单条「认领→执行」循环。多条并行跑即得并发；原子认领保证不重复领同一条。"""
+    slot_id = f"{worker_id}#{slot}"   # 每槽独立 id，便于在 job 记录/日志里区分
+    while not stop["flag"]:
+        job = jobstore.claim_next(slot_id)
+        if job is None:
+            time.sleep(POLL_INTERVAL)
+            continue
+        try:
+            _run_one(job)
+        except Exception as e:  # noqa: BLE001
+            jobstore.finish_job(job["id"], status="failed",
+                                error=f"worker 异常: {e}")
+            print(f"[worker] job {job['id']} worker 层异常: {e}", file=sys.stderr)
+
+
 def main() -> None:
     worker_id = f"{socket.gethostname()}-{os.getpid()}-{uuid.uuid4().hex[:4]}"
     jobstore.init_db()
@@ -125,7 +150,7 @@ def main() -> None:
     if n:
         print(f"[worker] 退回 {n} 条超时 running job")
     print(f"[worker] {worker_id} 上线，轮询间隔 {POLL_INTERVAL}s，job 超时 {JOB_TIMEOUT}s，"
-          f"沙箱模式={SANDBOX_MODE}")
+          f"并发度={WORKER_CONCURRENCY}，沙箱模式={SANDBOX_MODE}")
 
     stop = {"flag": False}
 
@@ -136,17 +161,23 @@ def main() -> None:
     signal.signal(signal.SIGINT, _graceful)
     signal.signal(signal.SIGTERM, _graceful)
 
-    while not stop["flag"]:
-        job = jobstore.claim_next(worker_id)
-        if job is None:
-            time.sleep(POLL_INTERVAL)
-            continue
-        try:
-            _run_one(job)
-        except Exception as e:  # noqa: BLE001
-            jobstore.finish_job(job["id"], status="failed",
-                                error=f"worker 异常: {e}")
-            print(f"[worker] job {job['id']} worker 层异常: {e}", file=sys.stderr)
+    # 起 N 条并行循环。各循环独占一个 claim→run 链路，重活在子进程里跑（阻塞在
+    # proc.wait 时释放 GIL），故线程足以实现真并行，无需多进程。
+    threads = [
+        threading.Thread(target=_claim_loop, args=(worker_id, i, stop),
+                         name=f"claim-{i}", daemon=True)
+        for i in range(WORKER_CONCURRENCY)
+    ]
+    for t in threads:
+        t.start()
+    # 主线程留守，让信号处理器能跑；等收到停止信号后所有循环自然收尾。
+    try:
+        while not stop["flag"]:
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        stop["flag"] = True
+    for t in threads:
+        t.join()
 
     print("[worker] 已退出")
 
