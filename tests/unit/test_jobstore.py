@@ -79,3 +79,15 @@ def test_active_and_daily_counts(tmp_db):
     assert js.count_active_jobs() == 1          # 完成一条
     # 当日总量应为 2（含已完成的）
     assert js.count_jobs_since(time.time() - 3600) == 2
+
+
+def test_feedback_store_and_list(tmp_db):
+    """用户反馈存储：按 job 存、可列出。"""
+    js = tmp_db
+    job = js.create_job("https://example.com", "x", max_rounds=1)
+    jid, sid = job["id"], job["site_id"]
+    assert js.list_feedback(jid) == []
+    js.add_feedback(jid, sid, "翻页按钮位置不对")
+    js.add_feedback(jid, sid, "配色偏暖")
+    fb = js.list_feedback(jid)
+    assert [f["text"] for f in fb] == ["翻页按钮位置不对", "配色偏暖"]

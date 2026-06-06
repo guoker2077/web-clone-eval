@@ -41,3 +41,31 @@ def test_rubric_without_modules_is_whole_page():
     r = _build_rubric(None)
     assert "整体页面" in r
     assert "modules" not in r
+
+
+# ── 用户反馈即时诊断（diagnose_feedback，用 mock client）─────────────────
+
+def test_diagnose_feedback_forces_user_source(monkeypatch):
+    """单条反馈提炼出的教训 source 必须强制为 user（不享客观信号豁免）。"""
+    import types
+    import diagnose as D
+
+    class _Resp:
+        content = [types.SimpleNamespace(
+            type="text",
+            text='[{"module_type": "pagination", "lesson": "翻页要真实可点"}]')]
+
+    class _Client:
+        def __init__(self): self.messages = self
+        def create(self, **kw): return _Resp()
+
+    monkeypatch.setattr(D, "get_client", lambda: _Client())
+    out = D.diagnose_feedback("下一页点了没反应", ["pagination", "search_input"])
+    assert len(out) == 1
+    assert out[0]["module_type"] == "pagination"
+    assert out[0]["source"] == "user"      # 强制标记
+
+
+def test_diagnose_feedback_empty_returns_empty():
+    import diagnose as D
+    assert D.diagnose_feedback("   ", ["pagination"]) == []

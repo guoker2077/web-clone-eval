@@ -60,6 +60,12 @@ function jobCard(job) {
     acts = `<div class="acts">
       <a href="/preview/${job.site_id}/" target="_blank">↗ 预览复刻页</a>
       <a href="/report/${job.site_id}" target="_blank">查看评估报告</a>
+    </div>
+    <div class="fb" data-id="${job.id}">
+      <textarea id="fb-${job.id}" class="fb-input"
+        placeholder="对复刻产物的反馈（如「翻页按钮位置不对」「配色偏暖」）——会被诊断 agent 提炼成跨站经验"></textarea>
+      <button class="fb-btn" data-id="${job.id}">提交反馈</button>
+      <span class="fb-msg" id="fbmsg-${job.id}"></span>
     </div>`;
   }
   const errHtml = job.error ? `<div class="err">${escapeHtml(job.error)}</div>` : "";
@@ -118,5 +124,31 @@ async function refresh() {
 }
 
 $("submit").addEventListener("click", submit);
+
+// 反馈提交（事件委托：卡片会重渲染，故绑在容器上）
+async function sendFeedback(jobId) {
+  const ta = $(`fb-${jobId}`);
+  const msg = $(`fbmsg-${jobId}`);
+  const text = (ta?.value || "").trim();
+  if (!text) { if (msg) msg.textContent = "请先写点反馈"; return; }
+  if (msg) msg.textContent = "提交中…";
+  try {
+    const r = await api(`/api/jobs/${jobId}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (ta) ta.value = "";
+    if (msg) msg.textContent = `已记录${r.lessons_learned ? `，提炼 ${r.lessons_learned} 条经验` : ""}`;
+  } catch (e) {
+    if (msg) msg.textContent = "提交失败：" + e.message;
+  }
+}
+
+$("jobs").addEventListener("click", (e) => {
+  const btn = e.target.closest(".fb-btn");
+  if (btn) sendFeedback(btn.dataset.id);
+});
+
 refresh();
 setInterval(refresh, 2000);

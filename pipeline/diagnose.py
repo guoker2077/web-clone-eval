@@ -101,3 +101,50 @@ def diagnose_run(signals: dict) -> list[dict]:
     except Exception as e:  # noqa: BLE001
         print(f"[diagnose] 诊断失败（不影响主流程）：{type(e).__name__}: {str(e)[:150]}")
         return []
+
+
+_FEEDBACK_PROMPT = """用户对一次网页复刻产物提了反馈。请把它提炼成可复用的教训。
+
+复刻范围涉及的模块类型（请尽量从中选 module_type）：
+{types}
+
+用户反馈：
+{feedback}
+
+要求：教训要**跨站通用、可操作**（写「这类模块通常该怎样」，别绑定具体站名）；
+module_type 优先用上面列出的类型，没有合适的才从这个清单选：{known}。
+只输出 JSON 数组，元素 {{"module_type": "...", "lesson": "..."}}。最多 4 条。"""
+
+
+def diagnose_feedback(feedback: str, module_types: list[str]) -> list[dict]:
+    """把单条用户反馈即时提炼成模块类型级教训（source 固定为 user）。
+
+    供 v2 报告页「提交反馈即时消费」用：不等下次 run，当场把人工信号转成教训候选。
+    module_types 来自该站 scope，约束类型选择、提高归类准确度。
+    """
+    if not feedback.strip():
+        return []
+    prompt = _FEEDBACK_PROMPT.format(
+        types=", ".join(module_types) or "（未知，自行判断）",
+        known=", ".join(KNOWN_TYPES), feedback=feedback.strip())
+    client = get_client()
+    try:
+        resp = client.messages.create(
+            model=DEFAULT_MODEL, max_tokens=800,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = "".join(b.text for b in resp.content
+                        if getattr(b, "type", "") == "text")
+        m = re.search(r"\[.*\]", text, re.DOTALL)
+        if not m:
+            return []
+        lessons = json.loads(m.group(0))
+        out = []
+        for l in lessons:
+            if isinstance(l, dict) and l.get("module_type") and l.get("lesson"):
+                l["source"] = "user"   # 强制标记来源，享受不到客观信号豁免
+                out.append(l)
+        return out
+    except Exception as e:  # noqa: BLE001
+        print(f"[diagnose] 反馈诊断失败：{type(e).__name__}: {str(e)[:150]}")
+        return []

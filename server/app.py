@@ -132,6 +132,49 @@ def job_logs(job_id: str, after_id: int = 0,
     return {"logs": jobstore.get_logs(job_id, after_id=after_id)}
 
 
+class FeedbackReq(BaseModel):
+    text: str = Field(..., min_length=1, max_length=2000,
+                      description="对复刻产物的人工反馈")
+
+
+@app.post("/api/jobs/{job_id}/feedback")
+def submit_feedback(job_id: str, req: FeedbackReq,
+                    _: None = Depends(require_auth)) -> dict:
+    """用户对复刻产物提反馈 → 存库 + 即时交诊断 agent 提炼成跨站教训。
+
+    人工信号是「迟到」的（看完报告才提），故采用提交即时消费：当场跑一次轻量诊断
+    写入记忆库，不等下次 run。用户反馈是解释性信号，不享客观信号的同-run 豁免，
+    仍需 ≥2 次不同来源确认才转 active（生命周期由 pitfall_memory 管）。
+    """
+    job = jobstore.get_job(job_id)
+    if job is None:
+        raise HTTPException(404, "job 不存在")
+    site_id = job["site_id"]
+    text = req.text.strip()
+    jobstore.add_feedback(job_id, site_id, text)
+
+    learned = 0
+    try:
+        scope_path = ROOT / "scopes" / f"{site_id}.json"
+        module_types = []
+        if scope_path.exists():
+            import json as _json
+            from diagnose_match import scope_module_types
+            scope = _json.loads(scope_path.read_text(encoding="utf-8"))
+            module_types = scope_module_types(scope)
+        from diagnose import diagnose_feedback
+        from pitfall_memory import upsert_lesson
+        for l in diagnose_feedback(text, module_types):
+            # 用 job_id 作 run 标识：同一反馈不重复计数；不同 job 的反馈才累加
+            upsert_lesson(l["module_type"], l["lesson"], "user", job_id)
+            learned += 1
+    except Exception as e:  # noqa: BLE001
+        # 提炼失败不影响反馈已存库
+        print(f"[feedback] 即时诊断失败（反馈已记录）：{str(e)[:150]}")
+
+    return {"ok": True, "stored": True, "lessons_learned": learned}
+
+
 def _safe_dist_file(site_id: str, rel: str) -> Path:
     """把 /preview/<site_id>/<rel> 映射到 output/<site_id>/dist/<rel>，
     并防目录穿越（rel 解析后必须仍在 dist 内）。"""

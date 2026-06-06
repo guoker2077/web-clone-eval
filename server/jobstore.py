@@ -68,6 +68,15 @@ def init_db() -> None:
                 line    TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_logs_job ON job_logs(job_id, id);
+
+            CREATE TABLE IF NOT EXISTS job_feedback (
+                id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id   TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+                site_id  TEXT NOT NULL,
+                ts       REAL NOT NULL,
+                text     TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_fb_job ON job_feedback(job_id, id);
             """
         )
         # 兼容旧库：早期 jobs 表没有 client_ip 列，补加（已存在则忽略）
@@ -184,6 +193,24 @@ def add_log(job_id: str, line: str, *, stage: str | None = None) -> None:
             "INSERT INTO job_logs(job_id, ts, stage, line) VALUES(?,?,?,?)",
             (job_id, time.time(), stage, line),
         )
+
+
+def add_feedback(job_id: str, site_id: str, text: str) -> None:
+    """记录用户对某次复刻产物的反馈（人工信号，供诊断 agent 提炼跨站教训）。"""
+    with _connect() as conn:
+        conn.execute(
+            "INSERT INTO job_feedback(job_id, site_id, ts, text) VALUES(?,?,?,?)",
+            (job_id, site_id, time.time(), text),
+        )
+
+
+def list_feedback(job_id: str) -> list[dict[str, Any]]:
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT id, ts, text FROM job_feedback WHERE job_id=? ORDER BY id",
+            (job_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def get_job(job_id: str) -> dict[str, Any] | None:
