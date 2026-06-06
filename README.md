@@ -8,9 +8,12 @@
 
 - **零脚本输入**：`synthesize_scope.py` 把「URL + 自然语言范围」自动展开成可驱动复刻与评估的结构化 scope，selector 取自真实 DOM，并经确定性校验。
 - **稳定复用**：新页面只给一句范围描述，流水线自动完成复刻与评估。
-- **闭环精修**：评估分数（视觉差异、失败的交互断言）回灌给 Claude 重新生成，分数驱动质量提升。
-- **可量化可置信**：采用 SSIM、CIEDE2000、pHash、IoU、断言通过率等业界公认指标，多视口测量，加权合成总分，权重透明可调。
-- **全自动评估**：复刻后无需人工驱动，构建→截图→打分→出报告一键完成。
+- **闭环精修（看图对比）**：评估后把「原页 + 上一轮复刻页」两张截图一起回灌，配合 LLM 逐模块诊断，让模型对比着改而非盲修；分数驱动质量提升。
+- **agent 记忆（跨站学习）**：诊断 agent 在每个 run 结束后复盘所有信号，提炼「模块类型级」教训存入全局记忆库，下次同类页面生成前按相关性注入「避坑清单」——一处踩坑、处处规避。
+- **截断自愈**：生成被 `max_tokens` 截断时用 prefill 续写无缝补全，杜绝半截工程落盘。
+- **可量化可置信**：SSIM、CIEDE2000、pHash、IoU、断言通过率等业界指标，逐模块裁剪比对；确定性指标可复现，并与 LLM 视觉分交叉验证（一致/存疑）。
+- **全自动评估 + 可独立运行交付**：复刻后构建→截图→打分→出报告→打包 `deliverables/<site>` 一键完成，产物零依赖可独立运行。
+- **并发异步服务**：云端 worker 单进程内多并发循环（`WORKER_CONCURRENCY`），受内存约束横向扩；SQLite 原子认领保证不重复领单。
 
 ## 流水线架构
 
@@ -23,17 +26,21 @@
    ▼
 ① Capture    Playwright 抓原页 → 多视口整页截图 + DOM 快照 + 配色/字体 + 关键元素 bbox
    ▼
-② Generate   Claude(claude-opus-4-8, 视觉输入) ← 截图+功能点 → 生成 Vite/React/TS 工程
+② Generate   Claude(claude-opus-4-8, 视觉输入) ← 截图 + 功能点 + 历史避坑清单(记忆)
+             → 生成 Vite/React/TS 工程（截断则 prefill 续写补全）
    ▼
    Build      npm install && npm run build → 起静态服务
    ▼
 ③ Evaluate   原页 vs 复刻页 → 视觉(逐模块裁剪 SSIM/像素/pHash) + 功能(覆盖率/断言)
              + 交互(状态/流程) + LLM 交叉验证（可置信）
    ▼
-④ Refine     分数 < 阈值 → 差异点+失败断言回灌 Claude → 回到② (限 N 轮，全自动)
+④ Refine     分数 < 阈值 → 「原页+复刻页」双图 + 逐模块诊断回灌 Claude → 回到② (限 N 轮)
    │
    ▼ 达标
-  报告 (report.md + eval.json + 截图) → 打包交付产物 deliverables/<site>
+  报告 (report.md + eval.json + 截图) → 打包交付 deliverables/<site>
+   │
+   ▼ run 结束
+⑤ Learn      诊断 agent 复盘全轮信号 → 提炼模块类型级教训 → 写入记忆库(候选→生效→退役)
 ```
 
 ## 目录结构
@@ -49,20 +56,26 @@ web-clone-eval/
 │  ├─ metrics_visual.py   #   视觉度量 SSIM/像素/pHash/CIEDE2000/IoU
 │  ├─ metrics_behavior.py #   功能&交互度量（Playwright 跑断言）
 │  ├─ metrics_llm.py      #   LLM 辅助视觉评分（加分项，交叉验证）
+│  ├─ diagnose.py         #   ⑤ 诊断 agent：复盘信号、提炼跨站教训
+│  ├─ diagnose_match.py   #   scope → 规范化模块类型（教训注入的相关性键）
+│  ├─ pitfall_memory.py   #   agent 记忆库：教训存储/生命周期/按需注入
 │  ├─ report.py           # 渲染 Markdown 报告
-│  ├─ run.py              # ④ 总控闭环
+│  ├─ deliver.py          # 打包可独立运行的交付产物 deliverables/<site>
+│  ├─ run.py              # ④ 总控闭环（含看图对比反馈 + run 末学习）
 │  └─ check_api.py        # API 连通性自测
 ├─ server/                # 云端异步服务（提交→后台跑→轮询→预览）
 │  ├─ app.py              #   FastAPI：提交/查询/进度 API + 预览路由 + UI（含鉴权）
-│  ├─ worker.py           #   worker：认领队列任务，子进程/docker 沙箱跑 runner
+│  ├─ worker.py           #   worker：多并发认领队列任务，子进程/docker 沙箱跑 runner
 │  ├─ runner.py           #   单 job 执行体（合成+闭环），进度回写 + setrlimit
 │  ├─ jobstore.py         #   SQLite 任务库+队列（WAL+原子认领）+ 配额计数
 │  ├─ quota.py            #   提交闸门：IP 限流/在途上限/每日总量
 │  └─ static/             #   最小交互界面（表单+轮询+一键跳转）
+├─ tests/unit/            # 一键单测（离线/确定/秒级，docker compose run --rm test）
 ├─ scopes/                # 每个站点一份 scope.json（唯一人工输入）
 ├─ output/<site>/         # 复刻产物（独立可运行的 Vite 工程）
 │  └─ _capture/           #   原页抓取的截图/DOM/meta
 ├─ deliverables/<site>/   # 交付产物：source/（可维护源码）+ dist/（独立运行）+ README
+├─ memory/                # agent 记忆库 pitfalls.json（跨站教训，可清空，见下）
 ├─ reports/<site>/        # 评估报告 + 复刻页截图 + 历史
 ├─ prompts/<site>/        # 留存的 prompt 与 Claude 响应（体现 AI 使用过程）
 ├─ run_logs/              # 运行日志 + EVIDENCE.md（可复现性与量化数据分析证据）
@@ -248,6 +261,7 @@ JOBS_DB="$PWD/server/jobs.db" .venv/bin/python -m server.worker
 | `JOB_RLIMIT` | 关 | 给 job 套 setrlimit | worker |
 | `JOB_CPU_SEC` / `JOB_FSIZE_MB` / `JOB_NPROC` | 900 / 512 / 512 | 各项资源上限 | worker |
 | `JOB_TIMEOUT_SEC` | 1800 | 单 job 墙钟上限 | worker |
+| `WORKER_CONCURRENCY` | 2 | 单 worker 进程内并行 job 数（受内存约束：16G 建议 4~6，2核4G 建议 2，应 ≤ `QUOTA_ACTIVE_MAX`） | worker |
 | `SANDBOX_MODE` | subprocess | `docker`=每 job 一次性容器 | worker |
 
 > `docker compose up web worker` 已在 compose 里把 SSRF/配额/rlimit 默认打开；
@@ -317,7 +331,41 @@ docker compose run --rm test          # 一键跑全部单测（推荐）
 
 > 设计分层：把「调模型/联网」的慢且不确定的部分隔离在单测之外（用 `check_api.py`
 > 与提交一个真实 job 做手动冒烟），单测只覆盖纯逻辑，故可放进 CI 反复跑。
-> 测试代码见 `tests/unit/`，约 44 个用例 1~2 秒跑完。
+> 测试代码见 `tests/unit/`，约 68 个用例 1~2 秒跑完。
+
+## agent 记忆（跨站学习 + 可清空）
+
+每个 run 结束后，**诊断 agent**（`pipeline/diagnose.py`）复盘整轮的所有信号——客观的
+（build 报错、孤儿 CSS、失败的交互断言）与解释性的（LLM 逐模块诊断）——把**复发性、
+结构性**的问题提炼成一条**跨站可复用、模块类型级**的教训，存入全局记忆库
+`memory/pitfalls.json`。下次**任何同类型模块**的页面在生成前，按相关性把相关教训注入
+prompt 当「避坑清单」——一处踩坑、处处规避。
+
+防污染靠教训的生命周期 + 信用分配：
+
+```
+candidate（候选，确认 <2 次，不注入）
+  → active（生效，独立确认 ≥2 次，注入 prompt）
+  → retired（退役，注入后连续无效则停止注入）
+```
+
+- 「独立确认 ≥2 次」按**不同 run** 计数；但**客观信号**（build 报错等）若在**同一个
+  run 内跨多轮反复**出现，就地折算满足 ≥2（编译器铁证不浪费一轮）；解释性信号不享此豁免。
+- 信用分配只看**该模块类型**的分数变化（而非总分），把全局归因缩成单模块归因。
+- 全局存、**按相关性取**：注入时只挑当前 scope 出现的模块类型 + status=active 的教训，
+  避免 context 膨胀与污染放大。
+
+**清空记忆（部署时按需）**：记忆库是纯数据文件，删掉即从零开始积累：
+
+```bash
+rm -f memory/pitfalls.json     # 清空所有已学教训，下次 run 重新积累
+```
+
+> 仓库里**预置了**我们真实跑出来的教训（体现「项目确实在学习」）。自行部署时若想要
+> 干净起点，按上面命令清空即可——不影响任何功能，只是重新开始学。
+> 记忆库以卷挂载（`./memory`）持久化，容器删除后教训仍在本地。
+
+## 新增一个复刻页面
 
 ### 方式 A：自动合成 scope（推荐，最小输入）
 

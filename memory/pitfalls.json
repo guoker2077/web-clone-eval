@@ -1,0 +1,36 @@
+{
+  "search_results": [
+    {
+      "id": "search_results-001",
+      "lesson": "搜索类页面必须真正渲染结果列表容器，并在提交查询后动态填充与查询词相关的结果条目，不能用一行静态说明文案代替。复刻时要保留结果项的可重复结构（列表/卡片），并确保结果区域可见、包含查询关键词文本，以通过可见性与文案断言。",
+      "source": "assertion",
+      "evidence_count": 2,
+      "status": "active",
+      "hits": 0,
+      "misses": 0,
+      "miss_streak": 0,
+      "seen_runs": [
+        "bing"
+      ],
+      "created_at": 1780728184.563031,
+      "updated_at": 1780728184.563031
+    }
+  ],
+  "pagination": [
+    {
+      "id": "pagination-002",
+      "lesson": "带结果列表的页面要实现翻页控件（下一页/页码按钮），且翻页元素需真实存在并可见、可点击。不要因为只复刻首屏就省略分页模块，分页是结果类页面的标配交互，缺失会同时拉低交互断言与结构完整度。",
+      "source": "assertion",
+      "evidence_count": 2,
+      "status": "active",
+      "hits": 0,
+      "misses": 0,
+      "miss_streak": 0,
+      "seen_runs": [
+        "bing"
+      ],
+      "created_at": 1780728184.563261,
+      "updated_at": 1780728184.563261
+    }
+  ]
+}
