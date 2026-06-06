@@ -22,7 +22,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 # 源码快照排除项：依赖、构建产物、轮次快照、抓取中间产物
-_SKIP = {"node_modules", "dist", ".rounds", "_capture"}
+# 源码快照排除项：依赖、构建产物、轮次快照、抓取中间产物、内部 sidecar
+_SKIP = {"node_modules", "dist", ".rounds", "_capture", ".last_orphans.json"}
 
 
 def _copy_source(src_dir: Path, dest: Path) -> None:

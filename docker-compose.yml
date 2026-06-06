@@ -30,6 +30,8 @@ x-common: &common
     - ./prompts:/app/prompts
     # 交付产物（干净源码 + 已构建 dist + README）：随仓库提交的复刻成果
     - ./deliverables:/app/deliverables
+    # agent 记忆库：诊断 agent 提炼的跨站教训，必须持久化（跨 run/容器复用）
+    - ./memory:/app/memory
     # scopes 双向挂载：宿主机新增/合成的 scope 立即对容器可见
     - ./scopes:/app/scopes
     # 队列 DB + worker 日志：web 与 worker 共享，故放独立 data 卷

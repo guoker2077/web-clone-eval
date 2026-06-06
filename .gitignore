@@ -27,6 +27,7 @@ playwright-report/
 # 评估中间产物（截图体积大，按需保留）
 output/**/node_modules/
 output/**/.rounds/
+output/**/.last_orphans.json
 reports/**/*.tmp.png
 
 # 服务端本地状态（队列 DB、worker 日志、数据卷）

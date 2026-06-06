@@ -31,7 +31,7 @@ def _img_block(path: Path) -> dict:
 
 
 def _build_prompt(scope: dict, capture_meta: dict, feedback: str | None,
-                  has_clone_shot: bool = False) -> str:
+                  has_clone_shot: bool = False, pitfalls: str = "") -> str:
     features = "\n".join(
         f"  - [{f['id']}] ({f.get('type','element')}) {f['desc']}"
         + (f"  原选择器提示: {f['selector_hint']}" if f.get("selector_hint") else "")
@@ -71,7 +71,7 @@ def _build_prompt(scope: dict, capture_meta: dict, feedback: str | None,
 - 主要背景色: {colors.get('background', [])}
 - 字体族: {fonts.get('family', [])}
 - 字号: {fonts.get('size', [])}
-{feedback_section}
+{feedback_section}{pitfalls}
 ## 技术要求
 1. 用 Vite + React + TypeScript 工程，可 `npm install && npm run build` 构建。
 2. 视觉上尽量贴近截图：布局、配色、字体、间距、组件样式。
@@ -172,7 +172,16 @@ def generate(scope: dict, feedback: str | None = None, round_no: int = 0,
 
     desktop_png = out / "_capture" / "desktop.png"
     has_clone = bool(clone_shot and Path(clone_shot).exists())
-    prompt = _build_prompt(scope, capture_meta, feedback, has_clone_shot=has_clone)
+    # 注入历史避坑清单：只取当前 scope 涉及的模块类型 + active 教训（按需取，防膨胀）
+    pitfalls = ""
+    try:
+        from pitfall_memory import render_for_prompt
+        from diagnose_match import scope_module_types
+        pitfalls = render_for_prompt(scope_module_types(scope))
+    except Exception:  # noqa: BLE001
+        pitfalls = ""   # 记忆模块缺失/出错绝不阻断生成
+    prompt = _build_prompt(scope, capture_meta, feedback,
+                           has_clone_shot=has_clone, pitfalls=pitfalls)
     content: list[dict] = [{"type": "text", "text": prompt}]
     # 第一张：原页（视觉目标）
     if desktop_png.exists():
@@ -230,18 +239,20 @@ def generate(scope: dict, feedback: str | None = None, round_no: int = 0,
     return out
 
 
-def _ensure_css_imported(out: Path) -> None:
+def _ensure_css_imported(out: Path) -> list[str]:
     """兜底：把没有被任何 .ts/.tsx import 的"孤儿 CSS"自动引入 App/main。
 
     上游 prompt 已要求每个 .css 都被 import，但模型偶尔漏掉，导致样式不打包、
     页面退化成默认样式。这里做确定性补救：扫描产物，发现孤儿 CSS 就追加 import。
+
+    返回检测到的孤儿 CSS 文件名列表（供诊断 agent 当作客观信号；无则空列表）。
     """
     src = out / "src"
     if not src.exists():
-        return
+        return []
     css_files = [p for p in src.rglob("*.css")]
     if not css_files:
-        return
+        return []
     code_files = list(src.rglob("*.tsx")) + list(src.rglob("*.ts"))
     imported = "\n".join(p.read_text(encoding="utf-8", errors="ignore")
                          for p in code_files)
@@ -251,7 +262,7 @@ def _ensure_css_imported(out: Path) -> None:
     if not anchor.exists():
         anchor = src / "main.tsx"
     if not anchor.exists():
-        return
+        return []
 
     orphans = []
     for css in css_files:
@@ -259,7 +270,7 @@ def _ensure_css_imported(out: Path) -> None:
         if f"{css.stem}.css" not in imported:
             orphans.append(css)
     if not orphans:
-        return
+        return []
 
     import os
     lines = anchor.read_text(encoding="utf-8").splitlines()
@@ -274,8 +285,16 @@ def _ensure_css_imported(out: Path) -> None:
                        if ln.lstrip().startswith("import ")), default=-1)
     lines[last_import + 1:last_import + 1] = inserts
     anchor.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    names = [c.name for c in orphans]
     print(f"[generate] 兜底：为 {len(orphans)} 个孤儿 CSS 在 {anchor.name} 补 import "
-          f"({', '.join(c.name for c in orphans)})")
+          f"({', '.join(names)})")
+    # 落一个 sidecar，供 run 收集为诊断信号（每轮覆盖）
+    try:
+        (out / ".last_orphans.json").write_text(
+            json.dumps(names, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
+    return names
 
 
 if __name__ == "__main__":

@@ -131,6 +131,80 @@ def _diagnose(scope: dict, rep_dir: Path) -> dict | None:
     return diag or None
 
 
+def _collect_signals(out, result, rnd, signals):
+    """收集本轮客观诊断信号：孤儿 CSS（generate 落的 sidecar）+ 失败断言 + 缺失元素。"""
+    orphan_f = out / ".last_orphans.json"
+    if orphan_f.exists():
+        try:
+            names = json.loads(orphan_f.read_text(encoding="utf-8"))
+            if names:
+                signals["orphan_css"].append((rnd, names))
+        except (json.JSONDecodeError, OSError):
+            pass
+    for fid, fb in result.get("behaviors", {}).get("features", {}).items():
+        if not fb.get("ok"):
+            failed = [a["step"] for a in fb.get("asserts", []) if not a.get("ok")]
+            if failed:
+                signals["failed_asserts"].append((rnd, fid, failed))
+    missing = [k for k, v in result.get("behaviors", {}).get("elements", {}).items()
+               if not v]
+    if missing:
+        signals["missing_elements"].append((rnd, missing))
+
+
+def _collect_llm_signals(llm_diag, rnd, signals):
+    """收集 LLM 逐模块低分诊断（解释性信号，需更多确认才生效）。"""
+    if not llm_diag:
+        return
+    for _vp, s in llm_diag.items():
+        if not isinstance(s, dict) or s.get("error"):
+            continue
+        for mod in (s.get("modules") or []):
+            if isinstance(mod, dict) and isinstance(mod.get("score"), (int, float)) \
+                    and mod["score"] < 70 and mod.get("note"):
+                signals["llm_low_modules"].append(
+                    (rnd, mod.get("name", "?"), mod["score"], mod["note"]))
+
+
+def _learn_from_run(scope: dict, signals: dict) -> None:
+    """run 结束后：诊断 agent 提炼教训 → 写入记忆库（生命周期由 pitfall_memory 管）。
+
+    对主流程「尽力而为」——任何异常都不影响复刻结果。客观信号若同 run 跨多轮反复，
+    把轮数作为 intra_run_repeats 提示传下去，触发「同 run 就地满足 ≥2」豁免。
+    """
+    if not any(signals.get(k) for k in signals):
+        return
+    try:
+        from diagnose import diagnose_run
+        from pitfall_memory import upsert_lesson
+    except Exception:  # noqa: BLE001
+        return
+    rounds_with_build = len({r for r, _ in signals.get("build_errors", [])})
+    rounds_with_orphan = len({r for r, _ in signals.get("orphan_css", [])})
+    try:
+        lessons = diagnose_run(signals)
+    except Exception as e:  # noqa: BLE001
+        print(f"[learn] 诊断 agent 失败（不影响结果）：{str(e)[:120]}")
+        return
+    site_id = scope["id"]
+    n = 0
+    for l in lessons:
+        src = l.get("source", "llm")
+        repeats = int(l.get("intra_run_repeats", 1) or 1)
+        if src == "build":
+            repeats = max(repeats, rounds_with_build)
+        elif src == "orphan_css":
+            repeats = max(repeats, rounds_with_orphan)
+        try:
+            upsert_lesson(l["module_type"], l["lesson"], src, site_id,
+                          intra_run_repeats=repeats)
+            n += 1
+        except Exception:  # noqa: BLE001
+            continue
+    if n:
+        print(f"[learn] 诊断 agent 提炼 {n} 条教训写入记忆库（candidate/active）")
+
+
 def run(site_id: str, max_rounds: int, threshold: float, skip_capture: bool,
         progress: ProgressFn = _noop) -> dict:
     scope = json.loads((ROOT / "scopes" / f"{site_id}.json").read_text(encoding="utf-8"))
@@ -147,6 +221,10 @@ def run(site_id: str, max_rounds: int, threshold: float, skip_capture: bool,
     best_round = None
     rounds_dir = out / ".rounds"
     rep_dir = ROOT / "reports" / site_id
+    # 诊断信号收集（run 结束后交诊断 agent 提炼教训）。各项 (round, ...) 便于
+    # 判断「同 run 跨轮反复」——客观信号反复出现可就地满足生效门槛。
+    signals: dict = {"build_errors": [], "orphan_css": [], "failed_asserts": [],
+                     "missing_elements": [], "llm_low_modules": []}
     for rnd in range(max_rounds):
         print(f"\n===== Round {rnd} =====")
         try:
@@ -161,6 +239,7 @@ def run(site_id: str, max_rounds: int, threshold: float, skip_capture: bool,
                         f"请严格按 ===FILE: 路径=== 格式输出完整工程，确保能 npm build 并正常运行。")
             clone_shot = None   # 失败轮没有可用产物截图
             history.append({"round": rnd, "error": str(e)[:300]})
+            signals["build_errors"].append((rnd, str(e)[:400]))
             continue
 
         # 快照本轮源码，便于最后恢复最佳轮
@@ -172,6 +251,9 @@ def run(site_id: str, max_rounds: int, threshold: float, skip_capture: bool,
             best = result
             best_round = rnd
 
+        # 收集本轮客观信号（孤儿 CSS / 失败断言 / 缺失元素）供诊断 agent 复盘
+        _collect_signals(out, result, rnd, signals)
+
         if result["score"] >= threshold:
             print(f"[run] 达标 ({result['score']} >= {threshold})，停止精修。")
             progress("refining", f"达标（{result['score']} ≥ {threshold}），停止精修")
@@ -181,6 +263,8 @@ def run(site_id: str, max_rounds: int, threshold: float, skip_capture: bool,
         # 诊断（仅此时算，最后一轮/达标轮不浪费），把具体诊断写进反馈。
         if rnd < max_rounds - 1:
             llm_diag = _diagnose(scope, rep_dir)
+            # LLM 低分模块也收作诊断信号（解释性，需更多确认才生效）
+            _collect_llm_signals(llm_diag, rnd, signals)
             feedback = build_feedback(result, llm_visual=llm_diag)
             shot = rep_dir / "clone_desktop.png"
             clone_shot = shot if shot.exists() else None
@@ -195,6 +279,10 @@ def run(site_id: str, max_rounds: int, threshold: float, skip_capture: bool,
         evaluate(scope)   # 用最佳产物重算，保证 eval.json/截图与产物一致
         render(site_id)
         print(f"[run] 已恢复最佳轮 round{best_round} 为最终产物。")
+
+    # 诊断 agent 复盘本 run 的所有信号，提炼跨站可复用教训写入记忆库（agent 记忆）
+    progress("refining", "诊断 agent 复盘，沉淀跨站教训")
+    _learn_from_run(scope, signals)
 
     # 落盘运行历史
     rep_dir = ROOT / "reports" / site_id
