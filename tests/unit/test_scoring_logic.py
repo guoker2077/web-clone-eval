@@ -10,6 +10,7 @@ import pytest
 
 from evaluate import CROSS_AGREE_DELTA, cross_validation
 from metrics_behavior import coverage_score
+from run import build_feedback
 
 
 # ── cross_validation：可置信核心 ────────────────────────────────────────
@@ -95,3 +96,45 @@ def test_coverage_empty_defaults_to_one():
     assert cov["element_presence"] == 1.0
     assert cov["behavior_pass"] == 1.0
     assert cov["assert_pass"] == 1.0
+
+
+# ── build_feedback：精修反馈构造（含 LLM 逐模块诊断回灌）──────────────────
+
+def _eval_result(score=60.0, ssim=0.3):
+    return {
+        "score": score,
+        "dimensions": {"visual": 50, "functional": 70, "interaction": 60},
+        "visual_detail": {"desktop": {"ssim": ssim, "pixel_diff_ratio": 0.5}},
+        "behaviors": {"features": {}, "elements": {}},
+    }
+
+
+def test_feedback_includes_low_ssim_hint():
+    fb = build_feedback(_eval_result(ssim=0.3))
+    assert "SSIM" in fb and "视觉结构相似度偏低" in fb
+
+
+def test_feedback_without_llm_has_no_module_lines():
+    fb = build_feedback(_eval_result())
+    assert "视觉诊断" not in fb
+
+
+def test_feedback_injects_llm_diagnosis():
+    """传入 LLM 诊断时，整体点评与低分模块的具体 note 应进入反馈。"""
+    llm = {"desktop": {
+        "overall": 60, "comment": "整体偏简化",
+        "modules": [
+            {"name": "搜索按钮", "score": 30, "note": "颜色偏浅、位置偏右"},
+            {"name": "搜索框", "score": 95, "note": "还原良好"},
+        ],
+    }}
+    fb = build_feedback(_eval_result(), llm_visual=llm)
+    assert "整体偏简化" in fb
+    assert "搜索按钮" in fb and "颜色偏浅" in fb       # 低分模块进反馈
+    assert "搜索框" not in fb                          # 高分(>=80)模块不刷屏
+
+
+def test_feedback_skips_errored_llm_viewport():
+    llm = {"desktop": {"error": "截图缺失"}}
+    fb = build_feedback(_eval_result(), llm_visual=llm)
+    assert "视觉诊断" not in fb

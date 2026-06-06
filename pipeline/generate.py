@@ -30,7 +30,8 @@ def _img_block(path: Path) -> dict:
     }
 
 
-def _build_prompt(scope: dict, capture_meta: dict, feedback: str | None) -> str:
+def _build_prompt(scope: dict, capture_meta: dict, feedback: str | None,
+                  has_clone_shot: bool = False) -> str:
     features = "\n".join(
         f"  - [{f['id']}] ({f.get('type','element')}) {f['desc']}"
         + (f"  原选择器提示: {f['selector_hint']}" if f.get("selector_hint") else "")
@@ -42,14 +43,25 @@ def _build_prompt(scope: dict, capture_meta: dict, feedback: str | None) -> str:
 
     feedback_section = ""
     if feedback:
+        # 有复刻页截图时，明确告诉模型「对比两张图」——把盲修变成看图修正
+        compare_hint = ""
+        if has_clone_shot:
+            compare_hint = (
+                "\n本轮我额外附上**你上一轮复刻页的截图**：第一张是原页（目标），"
+                "第二张是你上轮的产物。请**逐处对比两张图的差异**（位置/大小/颜色/"
+                "间距/缺失元素），针对性修正，不要凭空猜测。")
         feedback_section = f"""
 ## 上一轮评估反馈（必须针对性修正）
 {feedback}
-请重点修复上述低分维度与失败的交互断言。
+请重点修复上述低分维度与失败的交互断言。{compare_hint}
 """
 
+    img_desc = ("我会提供原页的整页截图、提取的配色/字体信息，以及需要复刻的功能点。"
+                if not has_clone_shot else
+                "我会提供两张截图（第一张=原页目标，第二张=你上轮复刻页）、"
+                "配色/字体信息，以及需要复刻的功能点。")
     return f"""你是资深前端工程师。请复刻目标网页「{scope['name']}」({scope['url']})。
-我会提供原页的整页截图、提取的配色/字体信息，以及需要复刻的功能点。
+{img_desc}
 
 ## 复刻范围（只需实现以下功能点，不要多做）
 {features}
@@ -104,17 +116,27 @@ def _parse_files(text: str) -> dict[str, str]:
     return files
 
 
-def generate(scope: dict, feedback: str | None = None, round_no: int = 0) -> Path:
+def generate(scope: dict, feedback: str | None = None, round_no: int = 0,
+             clone_shot: Path | None = None) -> Path:
+    """生成复刻工程。
+
+    clone_shot: 上一轮复刻页的截图路径。精修轮传入后，会与原页截图一起发给模型，
+    让它「对比两张图」做视觉修正（而非只拿抽象分数盲修）。
+    """
     site_id = scope["id"]
     out = ROOT / "output" / site_id
     capture_meta = json.loads((out / "_capture" / "meta.json").read_text(encoding="utf-8"))
 
-    prompt = _build_prompt(scope, capture_meta, feedback)
-    content: list[dict] = [{"type": "text", "text": prompt}]
-    # 附原页桌面端截图（视觉参考）
     desktop_png = out / "_capture" / "desktop.png"
+    has_clone = bool(clone_shot and Path(clone_shot).exists())
+    prompt = _build_prompt(scope, capture_meta, feedback, has_clone_shot=has_clone)
+    content: list[dict] = [{"type": "text", "text": prompt}]
+    # 第一张：原页（视觉目标）
     if desktop_png.exists():
         content.append(_img_block(desktop_png))
+    # 第二张：上轮复刻页（精修时对比用）——顺序与 prompt 里「第一张/第二张」一致
+    if has_clone:
+        content.append(_img_block(Path(clone_shot)))
 
     client = get_client()
     text = ""

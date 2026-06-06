@@ -16,6 +16,7 @@ from typing import Callable
 from capture import capture
 from evaluate import evaluate
 from generate import generate
+from metrics_llm import llm_visual_score, scope_modules
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -27,8 +28,13 @@ def _noop(stage: str, message: str) -> None:  # noqa: ARG001
     pass
 
 
-def build_feedback(result: dict) -> str:
-    """把评估结果转成给 Claude 的针对性修正反馈。"""
+def build_feedback(result: dict, llm_visual: dict | None = None) -> str:
+    """把评估结果转成给 Claude 的针对性修正反馈。
+
+    llm_visual: 可选的 LLM 逐模块视觉诊断（{viewport: {overall, comment, modules:[...]}}）。
+    传入后，把「搜索按钮偏右/颜色偏浅」这类具体诊断也写进反馈——比抽象的 SSIM 分
+    数对模型有用得多。
+    """
     lines = [f"上一轮总分 {result['score']}/100，各维度："]
     d = result["dimensions"]
     lines.append(f"- 视觉 {d['visual']}, 功能 {d['functional']}, 交互 {d['interaction']}")
@@ -38,6 +44,19 @@ def build_feedback(result: dict) -> str:
         if m["ssim"] < 0.7:
             lines.append(f"- [{vp}] 视觉结构相似度偏低 (SSIM={m['ssim']})，"
                          f"像素差异 {m['pixel_diff_ratio']}，请更贴近原页布局与配色。")
+
+    # LLM 逐模块视觉诊断（具体、可操作，比 SSIM 数字有用）
+    if llm_visual:
+        for vp, s in llm_visual.items():
+            if not isinstance(s, dict) or s.get("error"):
+                continue
+            if s.get("comment"):
+                lines.append(f"- [{vp}] 视觉诊断：{s['comment']}")
+            for mod in (s.get("modules") or []):
+                if isinstance(mod, dict) and mod.get("note") and \
+                        isinstance(mod.get("score"), (int, float)) and mod["score"] < 80:
+                    lines.append(f"  · 模块「{mod.get('name','?')}」(得分 {mod['score']})："
+                                 f"{mod['note']}")
 
     # 失败的交互断言
     for fid, fb in result["behaviors"]["features"].items():
@@ -89,6 +108,29 @@ def _restore_src(out: Path, src: Path) -> None:
             shutil.copy2(child, out / child.name)
 
 
+def _diagnose(scope: dict, rep_dir: Path) -> dict | None:
+    """精修轮专用：对刚评估的复刻页算一次 LLM 逐模块视觉诊断。
+
+    精修循环里 evaluate(use_llm=False) 不算诊断（省成本）；这里在「还有下一轮要修」
+    时单独按需算一次，产出具体诊断回灌给下一轮 generate。失败不致命（返回 None，
+    反馈退回纯指标版）。复刻页截图复用评估阶段已截好的 reports/<site>/clone_*.png。
+    """
+    cap_dir = ROOT / "output" / scope["id"] / "_capture"
+    modules = scope_modules(scope)
+    diag: dict = {}
+    try:
+        for vp in scope["viewports"]:
+            name = vp["name"]
+            ref_png = cap_dir / f"{name}.png"
+            clone_png = rep_dir / f"clone_{name}.png"
+            if ref_png.exists() and clone_png.exists():
+                diag[name] = llm_visual_score(ref_png, clone_png, modules)
+    except Exception as e:  # noqa: BLE001
+        print(f"[run] LLM 诊断失败（不影响精修，退回纯指标反馈）：{str(e)[:120]}")
+        return None
+    return diag or None
+
+
 def run(site_id: str, max_rounds: int, threshold: float, skip_capture: bool,
         progress: ProgressFn = _noop) -> dict:
     scope = json.loads((ROOT / "scopes" / f"{site_id}.json").read_text(encoding="utf-8"))
@@ -99,15 +141,17 @@ def run(site_id: str, max_rounds: int, threshold: float, skip_capture: bool,
         capture(scope)
 
     feedback: str | None = None
+    clone_shot: Path | None = None   # 上一轮复刻页截图，精修时回灌做视觉对比
     history = []
     best = None
     best_round = None
     rounds_dir = out / ".rounds"
+    rep_dir = ROOT / "reports" / site_id
     for rnd in range(max_rounds):
         print(f"\n===== Round {rnd} =====")
         try:
             progress(f"generating", f"第 {rnd} 轮：Claude 生成复刻工程")
-            generate(scope, feedback=feedback, round_no=rnd)
+            generate(scope, feedback=feedback, round_no=rnd, clone_shot=clone_shot)
             progress(f"evaluating", f"第 {rnd} 轮：构建 + 截图 + 打分")
             result = evaluate(scope, use_llm=False)
         except Exception as e:  # noqa: BLE001
@@ -115,6 +159,7 @@ def run(site_id: str, max_rounds: int, threshold: float, skip_capture: bool,
             progress(f"refining", f"第 {rnd} 轮失败，将回灌反馈重试: {str(e)[:120]}")
             feedback = (f"上一轮生成/构建/运行失败：{str(e)[:300]}。"
                         f"请严格按 ===FILE: 路径=== 格式输出完整工程，确保能 npm build 并正常运行。")
+            clone_shot = None   # 失败轮没有可用产物截图
             history.append({"round": rnd, "error": str(e)[:300]})
             continue
 
@@ -131,7 +176,16 @@ def run(site_id: str, max_rounds: int, threshold: float, skip_capture: bool,
             print(f"[run] 达标 ({result['score']} >= {threshold})，停止精修。")
             progress("refining", f"达标（{result['score']} ≥ {threshold}），停止精修")
             break
-        feedback = build_feedback(result)
+
+        # 还有下一轮要修：① 回灌本轮复刻页截图做视觉对比；② 算一次 LLM 逐模块
+        # 诊断（仅此时算，最后一轮/达标轮不浪费），把具体诊断写进反馈。
+        if rnd < max_rounds - 1:
+            llm_diag = _diagnose(scope, rep_dir)
+            feedback = build_feedback(result, llm_visual=llm_diag)
+            shot = rep_dir / "clone_desktop.png"
+            clone_shot = shot if shot.exists() else None
+        else:
+            feedback = build_feedback(result)
 
     # 恢复最佳轮的产物 + 重新生成最佳轮的报告
     if best_round is not None:
