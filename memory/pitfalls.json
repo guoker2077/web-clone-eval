@@ -32,5 +32,22 @@
       "created_at": 1780728184.563261,
       "updated_at": 1780728184.563261
     }
+  ],
+  "login_submit": [
+    {
+      "id": "login_submit-003",
+      "lesson": "复刻登录提交按钮时，点击后必须立即给出加载反馈：禁用按钮防止重复提交，并显示 loading 状态（如按钮内 spinner 或文字变为「登录中…」），直到请求返回结果再恢复。缺少这一步会让用户无法判断是否提交成功，容易反复点击。",
+      "source": "user",
+      "evidence_count": 1,
+      "status": "candidate",
+      "hits": 0,
+      "misses": 0,
+      "miss_streak": 0,
+      "seen_runs": [
+        "b04ec89fb842496fbd1f74ceebd9646b"
+      ],
+      "created_at": 1780730451.9473467,
+      "updated_at": 1780730451.9473467
+    }
   ]
 }
