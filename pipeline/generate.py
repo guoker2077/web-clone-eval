@@ -116,6 +116,49 @@ def _parse_files(text: str) -> dict[str, str]:
     return files
 
 
+def _complete_with_continuation(client, content: list[dict],
+                                max_cont: int = 3) -> tuple[str, str]:
+    """调模型生成；若因 max_tokens 截断，用 assistant prefill 续写直到写完。
+
+    截断 ≠ 出错：前面的内容完全正确，只是没写完。把已生成文本作为 assistant 消息
+    塞回、追加一句「continue」，模型从**断点无缝续接**（不会跑去「修代码」，因为
+    前面没错）。这与「回灌报错工程让它 debug」是两码事。
+
+    返回 (完整拼接文本, 最终 stop_reason)。最多续写 max_cont 次以防失控。
+    """
+    full = ""
+    stop_reason = None
+    msgs = [{"role": "user", "content": content}]
+    for cont in range(max_cont + 1):
+        resp = client.messages.create(
+            model=DEFAULT_MODEL,
+            max_tokens=24000,
+            messages=msgs,
+            # 高 max_tokens 下单请求可能逼近 SDK 的 10 分钟非流式上限，显式给足
+            # 超时，告诉 SDK 我们接受这个时长（否则它会直接报「需要流式」而拒发）。
+            timeout=600,
+        )
+        chunk = "".join(b.text for b in resp.content
+                        if getattr(b, "type", "") == "text")
+        full += chunk
+        stop_reason = resp.stop_reason
+        if stop_reason != "max_tokens":
+            break   # 正常写完
+        # 截断：把已生成内容作为 assistant 前缀塞回，要求从断点续写。
+        # 注意：Anthropic API 不允许 assistant 消息以空白结尾，故 prefill 用
+        # rstrip 后的版本；但累加进 full 的仍是原文，避免丢字符/错位。
+        print(f"[generate] 输出被 max_tokens 截断，续写第 {cont + 1} 次…")
+        prefill = full.rstrip()
+        msgs = [
+            {"role": "user", "content": content},
+            {"role": "assistant", "content": prefill},
+            {"role": "user", "content":
+                "上面的输出因长度被截断了，请从**断点处**继续输出剩余内容，"
+                "不要重复已输出的部分，也不要重新开始或加任何解释，直接接着写。"},
+        ]
+    return full, stop_reason
+
+
 def generate(scope: dict, feedback: str | None = None, round_no: int = 0,
              clone_shot: Path | None = None) -> Path:
     """生成复刻工程。
@@ -142,19 +185,14 @@ def generate(scope: dict, feedback: str | None = None, round_no: int = 0,
     text = ""
     stop_reason = None
     for attempt in range(3):
-        resp = client.messages.create(
-            model=DEFAULT_MODEL,
-            max_tokens=16000,
-            messages=[{"role": "user", "content": content}],
-        )
-        text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
-        stop_reason = resp.stop_reason
+        # 单次生成内部已含「截断→续写」补全；这层重试只兜底「空/无文件」的格式失败
+        text, stop_reason = _complete_with_continuation(client, content)
         if text.strip() and "===FILE:" in text:
             break
         print(f"[generate] 第{attempt+1}次返回空/无文件(stop={stop_reason})，重试...")
 
     if stop_reason == "max_tokens":
-        print("[generate] 警告：输出可能因 max_tokens 截断，末尾文件或不完整。")
+        print("[generate] 警告：续写多次后仍被 max_tokens 截断，末尾文件可能不完整。")
 
     # 留存 prompt 与响应（满足"体现 AI 使用过程"）
     pdir = ROOT / "prompts" / site_id
