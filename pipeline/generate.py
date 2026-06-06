@@ -172,12 +172,16 @@ def generate(scope: dict, feedback: str | None = None, round_no: int = 0,
 
     desktop_png = out / "_capture" / "desktop.png"
     has_clone = bool(clone_shot and Path(clone_shot).exists())
-    # 注入历史避坑清单：只取当前 scope 涉及的模块类型 + active 教训（按需取，防膨胀）
+    # 注入历史避坑清单：语义召回当前页相关的 active 教训（RAG，跨类型/跨语言），
+    # embedder 不可用则自动降级到类型精确匹配。按需取，防 prompt 膨胀与污染放大。
     pitfalls = ""
     try:
         from pitfall_memory import render_for_prompt
         from diagnose_match import scope_module_types
-        pitfalls = render_for_prompt(scope_module_types(scope))
+        # query 用「页面名 + 各功能点描述」，让语义检索贴合当前页实际涉及的模块
+        query = scope.get("name", "") + "；" + "；".join(
+            f.get("desc", "") for f in scope.get("features", []) if f.get("desc"))
+        pitfalls = render_for_prompt(scope_module_types(scope), query_text=query)
     except Exception:  # noqa: BLE001
         pitfalls = ""   # 记忆模块缺失/出错绝不阻断生成
     prompt = _build_prompt(scope, capture_meta, feedback,

@@ -40,6 +40,16 @@ RUN pip install -r requirements.txt
 RUN playwright install --with-deps chromium \
     && chmod -R a+rX /opt/pw-browsers
 
+# 3.5) 预下载语义检索 embedding 模型（教训 RAG 用）。经 modelscope（国内可靠）拉
+#      多语言小模型到共享缓存，避免运行时赌 HuggingFace 网络；非 root 也能读。
+#      下载失败不让构建中断——运行时 embedder 不可用会自动降级到关键词匹配。
+ENV FASTEMBED_CACHE_PATH=/opt/fastembed-cache \
+    EMBED_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+RUN python3 -c "from modelscope import snapshot_download; \
+    snapshot_download('${EMBED_MODEL}', cache_dir='/opt/fastembed-cache/ms')" \
+    && chmod -R a+rX /opt/fastembed-cache || \
+    echo "[build] 模型预下载失败，运行时将降级关键词匹配（不影响构建）"
+
 # 4) 流水线源码与 scopes（产物目录运行时由卷挂载/生成，已在 .dockerignore 排除）
 COPY pipeline/ ./pipeline/
 COPY scopes/ ./scopes/

@@ -52,12 +52,44 @@ def _save(data: dict) -> None:
                         encoding="utf-8")
 
 
+def backfill_embeddings() -> int:
+    """为记忆库里没有 embedding 的教训补算向量（升级到语义召回后的一次性迁移）。
+    返回补算的条数；embedder 不可用则跳过（不影响现有关键词路径）。"""
+    emb = _embed_text("test")  # 探测 embedder 是否可用
+    if emb is None:
+        return 0
+    data = _load()
+    n = 0
+    for mt, lessons in data.items():
+        for l in lessons:
+            if "embedding" not in l:
+                v = _embed_text(f"{mt}: {l['lesson']}")
+                if v:
+                    l["embedding"] = v
+                    n += 1
+    if n:
+        _save(data)
+    return n
+
+
 def _find(lessons: list[dict], lesson_text: str) -> dict | None:
     """按教训文本在某类型下找已有条目（去重，避免同义教训重复堆积）。"""
     for l in lessons:
         if l.get("lesson", "").strip() == lesson_text.strip():
             return l
     return None
+
+
+def _embed_text(text: str) -> list[float] | None:
+    """算一段文本的 embedding（list[float] 便于 JSON 存储）；不可用返回 None。"""
+    try:
+        from embedder import get_embedder
+        emb = get_embedder()
+        if emb is None:
+            return None
+        return [float(x) for x in emb.embed([text])[0]]
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def upsert_lesson(module_type: str, lesson: str, source: str, run_id: str,
@@ -86,6 +118,12 @@ def upsert_lesson(module_type: str, lesson: str, source: str, run_id: str,
             "seen_runs": [],
             "created_at": now,
         }
+        # 写库时算一次教训文本的 embedding 存下（之后检索复用，不重复计算）。
+        # 用「模块类型 + 教训」一起编码，让类型信息也进语义空间。embedder 不可用
+        # 则留空，检索时自动降级到关键词匹配。
+        emb = _embed_text(f"{module_type}: {lesson.strip()}")
+        if emb is not None:
+            item["embedding"] = emb
         lessons.append(item)
 
     # 计数：同一 run 只贡献一次「不同 run」计数；但客观信号的同 run 跨轮反复，
@@ -107,7 +145,7 @@ def upsert_lesson(module_type: str, lesson: str, source: str, run_id: str,
 
 
 def relevant_lessons(module_types: list[str]) -> list[dict]:
-    """注入用：只取「当前 scope 出现的类型 ∩ status=active」的教训。
+    """注入用（关键词路径/降级用）：取「当前 scope 出现的类型 ∩ status=active」的教训。
 
     全局存、按需取——避免把无关的历史坑全塞进 prompt 稀释注意力、放大污染。
     """
@@ -120,9 +158,54 @@ def relevant_lessons(module_types: list[str]) -> list[dict]:
     return out
 
 
-def render_for_prompt(module_types: list[str]) -> str:
-    """把相关 active 教训渲染成 prompt 里的「已知避坑清单」段落；无则返回空串。"""
-    lessons = relevant_lessons(module_types)
+def _all_active() -> list[dict]:
+    data = _load()
+    return [{**l, "module_type": mt} for mt, ls in data.items()
+            for l in ls if l.get("status") == "active"]
+
+
+def semantic_relevant_lessons(query_text: str, module_types: list[str],
+                              k: int = 5, min_sim: float = 0.35) -> list[dict]:
+    """语义召回（RAG 主路径）：用 query 语义在**所有** active 教训里找 top-k 相似。
+
+    相比 relevant_lessons 的类型精确分桶，这里**跨类型召回**——「搜索提交按钮」能
+    召回到挂在「登录提交按钮」下的 loading 教训（语义相近），解决跨类型复用与
+    跨语言匹配（中文教训 ↔ 英文 scope 描述）。
+
+    embedder 不可用、或教训无 embedding 时，自动降级到 relevant_lessons（类型精确）。
+    返回带 _sim 分的教训列表，按相似度降序、截断到 k 条且 ≥ min_sim。
+    """
+    from embedder import cosine, get_embedder
+    emb = get_embedder()
+    actives = _all_active()
+    have_vec = [l for l in actives if l.get("embedding")]
+    # 降级条件：模型不可用 / 没有任何带向量的教训
+    if emb is None or not have_vec:
+        return relevant_lessons(module_types)
+    try:
+        import numpy as np
+        qv = np.asarray(emb.embed([query_text])[0], dtype="float32")
+    except Exception:  # noqa: BLE001
+        return relevant_lessons(module_types)
+
+    scored = []
+    for l in have_vec:
+        sim = cosine(qv, l["embedding"])
+        if sim >= min_sim:
+            scored.append({**l, "_sim": round(sim, 3)})
+    scored.sort(key=lambda x: x["_sim"], reverse=True)
+    return scored[:k]
+
+
+def render_for_prompt(module_types: list[str], query_text: str = "") -> str:
+    """把相关 active 教训渲染成 prompt 的「已知避坑清单」；无则返回空串。
+
+    有 query_text 走语义召回（RAG），否则/降级走类型精确匹配。
+    """
+    if query_text:
+        lessons = semantic_relevant_lessons(query_text, module_types)
+    else:
+        lessons = relevant_lessons(module_types)
     if not lessons:
         return ""
     lines = ["## 已知避坑清单（历史复发问题，生成时务必规避）"]

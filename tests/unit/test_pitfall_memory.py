@@ -105,3 +105,55 @@ def test_record_outcome_hit_resets_streak(mem):
     mem.record_outcome("footer", lid, improved=False)
     # 只累计了 1 次连续 miss（中间被 hit 清零），仍 active
     assert len(mem.relevant_lessons(["footer"])) == 1
+
+
+# ── 语义召回（RAG）：用 mock embedder 验证排序逻辑，不跑真实模型 ──────────
+
+class _StubEmbedder:
+    """把文本映射成预设向量，测语义召回的 top-k 排序（确定、离线）。
+
+    表里按「教训写库时编码的文本」(=`module_type: lesson`) 与 query 文本给向量；
+    未登记的文本回退到零向量（相似度 0）。
+    """
+    def __init__(self, table):
+        self.table = table
+
+    def embed(self, texts):
+        import numpy as np
+        return [np.asarray(self.table.get(t, [0.0, 0.0]), dtype="float32")
+                for t in texts]
+
+
+def test_semantic_recall_crosses_types(mem, monkeypatch):
+    """语义召回跨类型：query 语义≈登录提交，应把挂在 login_submit 下的教训排在
+    footer 之前——即便检索时根本没传 module_types。证明 RAG 跨类型复用。"""
+    import embedder as emb
+    table = {
+        # 写库编码文本：f"{module_type}: {lesson}"
+        "login_submit: 登录按钮点击要给 loading 反馈": [0.9, 0.1],   # 近 query
+        "footer: 页脚分栏布局":                        [0.0, 1.0],   # 远 query
+        "提交按钮交互":                                 [1.0, 0.0],   # query 文本
+    }
+    monkeypatch.setattr(emb, "get_embedder", lambda: _StubEmbedder(table))
+
+    mem.upsert_lesson("login_submit", "登录按钮点击要给 loading 反馈", "build",
+                      "r1", intra_run_repeats=2)
+    mem.upsert_lesson("footer", "页脚分栏布局", "build", "r2", intra_run_repeats=2)
+
+    # 注意：module_types 故意传空，证明召回不依赖类型精确匹配，纯靠语义
+    got = mem.semantic_relevant_lessons("提交按钮交互", module_types=[], k=5)
+    assert got, "应召回到语义相近的教训"
+    assert got[0]["module_type"] == "login_submit"      # 最相近排第一
+    assert got[0]["_sim"] > (got[-1]["_sim"] if len(got) > 1 else 0)
+
+
+def test_semantic_recall_falls_back_without_embedder(mem, monkeypatch):
+    """embedder 不可用时，语义召回降级到类型精确匹配（不崩、仍可用）。"""
+    import embedder as emb
+    monkeypatch.setattr(emb, "get_embedder", lambda: None)
+    mem.upsert_lesson("pagination", "翻页要真实可点", "build", "r1", intra_run_repeats=2)
+    # 降级路径：按类型取，传入 pagination 应拿到，传入无关类型则空
+    assert len(mem.semantic_relevant_lessons("x", ["pagination"])) == 1
+    assert mem.semantic_relevant_lessons("x", ["footer"]) == []
+
+
